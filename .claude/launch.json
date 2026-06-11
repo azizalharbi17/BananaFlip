@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bananaflip",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start", "--", "-p", "3789"],
+      "port": 3789
+    },
+    {
+      "name": "reference",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "3790"],
+      "port": 3790
+    }
+  ]
+}
