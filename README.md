@@ -8,55 +8,94 @@ cap, and how many ×'s away the flippening is.
 impliedPrice = priceA × (mcapB / mcapA)
 ```
 
-> ⚠️ Currently running on **demo data** (see the pill in the nav). All numbers
-> are mock figures from the design prototype.
-
 ## Stack
 
 - [Next.js 14](https://nextjs.org) (App Router) · React 18 · TypeScript
 - Tailwind CSS (design tokens in [tailwind.config.ts](tailwind.config.ts),
   mirrored as CSS variables in [app/globals.css](app/globals.css))
 - Fonts via `next/font`: Space Grotesk (display), Inter (body), JetBrains Mono (data)
-- Zero runtime dependencies beyond Next/React; deploys to Vercel as-is
+- Supabase (Postgres) for live coin data, refreshed from coinpaprika by cron
+- Deploys to Vercel as-is
 
 ## Development
 
 ```bash
+cp .env.local.example .env.local   # fill in Supabase credentials
 npm install
 npm run dev    # http://localhost:3000
 npm run build  # production build (also runs lint + type checks)
 ```
 
-## Architecture
+Without credentials the site runs entirely on the bundled demo seed and
+shows the **DEMO DATA** pill — handy for offline work.
 
-### Data flows through one module
+## Live data pipeline
 
-All coin data is read through **`getCoins()`** in [lib/coins.ts](lib/coins.ts),
-which currently serves the demo seed in [data/coins.json](data/coins.json).
-To go live, swap the body of `getCoins()` for a read from a real store
-(e.g. a cron job writing CoinGecko snapshots to Supabase). Every consumer —
-API routes, pages, sitemap — goes through this function, so nothing else
-changes. The frontend never calls third-party APIs.
+```
+coinpaprika /v1/tickers ──(every 10 min)──▶ POST /api/refresh ──▶ Supabase `coins`
+                                                                      │
+                getCoins() · 60s cache · demo fallback ◀──────────────┘
+                  │
+                  ├── pages (ISR, revalidate 60)
+                  └── /api/search · /api/coin/:slug · /api/compare
+```
 
-### Internal API
+1. **Schema** — run [supabase/migrations/0001_create_coins.sql](supabase/migrations/0001_create_coins.sql)
+   in the Supabase SQL editor once.
+2. **Refresh** — `POST /api/refresh` with `Authorization: Bearer $CRON_SECRET`
+   pulls tickers (rank 1–2000, positive market cap), assigns slugs, and
+   batch-upserts in chunks of 500. Returns `{updated, skipped, ms}`.
+   [.github/workflows/refresh.yml](.github/workflows/refresh.yml) calls it
+   every 10 minutes (requires a `CRON_SECRET` repo secret; also supports
+   manual `workflow_dispatch`).
+3. **Reads** — `getCoins()` in [lib/coins.ts](lib/coins.ts) is the single
+   data-access point: Supabase, cached 60 s (busted immediately by the
+   refresh via `revalidateTag`). If Supabase is unconfigured, unreachable,
+   or empty, it serves [data/coins.json](data/coins.json) and flags
+   `isDemoData` — the demo pill comes back and the site never breaks.
+
+### Slugs
+
+URL slugs are the clean lowercase symbol (`btc`, `pepe`). On symbol
+collisions the lowest-rank coin keeps the clean slug; later coins get
+`symbol-name`. Slugs are assigned on first sight and **never change across
+refreshes**, and the 24 original demo slugs are preserved. Slugs never
+contain `-flip-` (the pair-URL separator), so `/a-flip-b` parses
+unambiguously.
+
+### Colors
+
+The 24 demo coins keep their hand-picked disc colors; every other coin gets
+a stable mid-tone color hashed from its symbol ([lib/colors.ts](lib/colors.ts)).
+
+## Environment
+
+| Variable | Purpose |
+| --- | --- |
+| `SUPABASE_URL` | Supabase project URL (server-side only) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service-role key (server-side only) |
+| `CRON_SECRET` | Bearer token guarding `/api/refresh` |
+| `NEXT_PUBLIC_SITE_URL` | Optional canonical origin for metadata/sitemap |
+
+## Internal API
 
 | Route | Returns |
 | --- | --- |
-| `GET /api/search?q=do` | Coins matching name/symbol, ranked by market cap |
-| `GET /api/coin/:id` | One coin with its market-cap rank |
+| `GET /api/search?q=do` | Coins matching name/symbol, best rank first (limit 20) |
+| `GET /api/coin/:slug` | One coin with its market-cap rank |
 | `GET /api/compare?challenger=pepe&target=doge` | Implied price, multiplier, cap gap, already-flipped flag |
+| `GET/POST /api/refresh` | Cron-only data refresh (bearer auth) |
 
-### Shareable flip pages
+## Shareable flip pages
 
-Every comparison has a canonical URL: **`/<challenger>-flip-<target>`**
-(e.g. [`/pepe-flip-doge`](https://bananaflip.vercel.app/pepe-flip-doge)).
-The hot pairs and all top-8 permutations are statically generated at build
-time; any other valid pair is rendered on first request and cached. Each page
-gets its own `<title>`, meta description, canonical link and OpenGraph tags,
-and all 552 pairs are listed in `sitemap.xml`. As you change coins in the UI,
-the address bar follows along via `history.replaceState`.
+Every comparison has a canonical URL: **`/<challenger>-flip-<target>`**.
+Hot pairs and the top-10 permutations are statically generated; any other
+valid pair renders on first request and is cached (ISR, 60 s). Each page
+gets its own `<title>`, meta description, canonical and OpenGraph tags.
+The sitemap lists the hot pairs plus top-40 × top-8 targets (≤600 URLs),
+regenerated hourly.
 
-### Design
+## Design
 
 [design-reference.html](design-reference.html) is the approved design and the
 source of truth. The CSS in `app/globals.css` is a 1:1 port of its stylesheet;
@@ -65,4 +104,5 @@ breakpoint behavior, and respect `prefers-reduced-motion`.
 
 ## Disclaimer
 
-Demo figures · prototype only · not financial advice.
+Market data by coinpaprika. The ROI time machine uses synthetic historical
+figures and is labeled accordingly. Not financial advice.
