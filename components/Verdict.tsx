@@ -8,7 +8,7 @@ import type { RankedCoin } from "@/lib/types";
 interface VerdictProps {
   a: RankedCoin;
   b: RankedCoin;
-  /** Full list — fixes the log-scale endpoints of the distance track. */
+  /** Top coins — fixes the log-scale endpoints of the distance track. */
   coins: RankedCoin[];
   /** Bumped by the dashboard whenever the price should count up. */
   pulse: number;
@@ -18,10 +18,13 @@ export default function Verdict({ a, b, coins, pulse }: VerdictProps) {
   const { multiplier, impliedPrice, capGap, alreadyFlipped } = compareCoins(a, b);
   const priceText = useCountUp(impliedPrice, fmtPrice, pulse);
 
-  // Log-scale positions across the whole dataset, as in the reference.
-  const lo = Math.log10(Math.min(...coins.map((c) => c.marketCap))) - 0.15;
-  const hi = Math.log10(Math.max(...coins.map((c) => c.marketCap))) + 0.15;
-  const pos = (v: number) => ((Math.log10(v) - lo) / (hi - lo)) * 100;
+  // Log-scale positions, as in the reference. The selection is included in
+  // the range (and clamped) since deep-ranked coins sit below the top slice.
+  const caps = coins.map((c) => c.marketCap).concat(a.marketCap, b.marketCap);
+  const lo = Math.log10(Math.min(...caps)) - 0.15;
+  const hi = Math.log10(Math.max(...caps)) + 0.15;
+  const pos = (v: number) =>
+    Math.min(100, Math.max(0, ((Math.log10(v) - lo) / (hi - lo)) * 100));
   const pa = pos(a.marketCap);
   const pb = pos(b.marketCap);
 

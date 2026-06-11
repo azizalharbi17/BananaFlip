@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCoinById } from "@/lib/coins";
+import { getCoinBySlug } from "@/lib/coins";
 import { compareCoins } from "@/lib/compare";
 
 export const dynamic = "force-dynamic";
@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
  * → the flip verdict: implied price, multiplier, cap gap.
  */
 export async function GET(request: NextRequest) {
-  const challengerId = request.nextUrl.searchParams.get("challenger");
-  const targetId = request.nextUrl.searchParams.get("target");
+  const challengerSlug = request.nextUrl.searchParams.get("challenger");
+  const targetSlug = request.nextUrl.searchParams.get("target");
 
-  if (!challengerId || !targetId) {
+  if (!challengerSlug || !targetSlug) {
     return NextResponse.json(
       { error: "Required query params: challenger, target" },
       { status: 400 }
@@ -20,13 +20,13 @@ export async function GET(request: NextRequest) {
   }
 
   const [challenger, target] = await Promise.all([
-    getCoinById(challengerId),
-    getCoinById(targetId),
+    getCoinBySlug(challengerSlug),
+    getCoinBySlug(targetSlug),
   ]);
 
   if (!challenger || !target) {
     return NextResponse.json(
-      { error: `Unknown coin id: ${!challenger ? challengerId : targetId}` },
+      { error: `Unknown coin: ${!challenger ? challengerSlug : targetSlug}` },
       { status: 404 }
     );
   }

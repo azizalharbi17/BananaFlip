@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CoinCard from "./CoinCard";
-import HotFlips from "./HotFlips";
+import HotFlips, { type HotRow } from "./HotFlips";
 import Verdict from "./Verdict";
 import { pairSlug } from "@/lib/pairs";
 import type { CompareResult, RankedCoin } from "@/lib/types";
 
 interface FlipDashboardProps {
+  /** Top coins — picker default list and distance-bar scale. */
   coins: RankedCoin[];
-  initialChallengerId: string;
-  initialTargetId: string;
+  initialChallenger: RankedCoin;
+  initialTarget: RankedCoin;
+  hotRows: HotRow[];
 }
 
 const reducedMotion = () =>
@@ -23,14 +25,13 @@ const reducedMotion = () =>
  */
 export default function FlipDashboard({
   coins,
-  initialChallengerId,
-  initialTargetId,
+  initialChallenger,
+  initialTarget,
+  hotRows,
 }: FlipDashboardProps) {
-  const byId = useMemo(() => new Map(coins.map((c) => [c.id, c])), [coins]);
   const [pair, setPair] = useState(() => ({
-    // Pages validate both ids against the dataset before rendering.
-    a: byId.get(initialChallengerId)!,
-    b: byId.get(initialTargetId)!,
+    a: initialChallenger,
+    b: initialTarget,
   }));
   // Incremented whenever the verdict price should animate (render(true)).
   const [pulse, setPulse] = useState(0);
@@ -112,25 +113,25 @@ export default function FlipDashboard({
       urlSynced.current = true; // initial URL comes from the server route
       return;
     }
-    if (pair.a.id === pair.b.id) return;
-    const slug = pairSlug({ challengerId: pair.a.id, targetId: pair.b.id });
+    if (pair.a.slug === pair.b.slug) return;
+    const slug = pairSlug({ challengerSlug: pair.a.slug, targetSlug: pair.b.slug });
     window.history.replaceState(null, "", `/${slug}`);
     document.title = `Can ${pair.a.symbol} flip ${pair.b.symbol}? — BananaFlip`;
-  }, [pair.a.id, pair.b.id, pair.a.symbol, pair.b.symbol]);
+  }, [pair.a.slug, pair.b.slug, pair.a.symbol, pair.b.symbol]);
 
-  // Refresh both sides from the internal compare API on pair change.
-  // A no-op on demo data, but the hook where live numbers will land.
+  // Refresh both sides from the internal compare API on pair change, so a
+  // long-lived tab picks up new prices as the cron updates them.
   useEffect(() => {
-    if (pair.a.id === pair.b.id) return;
+    if (pair.a.slug === pair.b.slug) return;
     const ctrl = new AbortController();
-    fetch(`/api/compare?challenger=${pair.a.id}&target=${pair.b.id}`, {
+    fetch(`/api/compare?challenger=${pair.a.slug}&target=${pair.b.slug}`, {
       signal: ctrl.signal,
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: CompareResult | null) => {
         if (!data) return;
         setPair((prev) => {
-          if (prev.a.id !== data.challenger.id || prev.b.id !== data.target.id) {
+          if (prev.a.slug !== data.challenger.slug || prev.b.slug !== data.target.slug) {
             return prev; // stale response — the pair moved on
           }
           const unchanged =
@@ -145,7 +146,7 @@ export default function FlipDashboard({
         /* offline or aborted — keep the data we have */
       });
     return () => ctrl.abort();
-  }, [pair.a.id, pair.b.id]);
+  }, [pair.a.slug, pair.b.slug]);
 
   return (
     <>
@@ -182,7 +183,7 @@ export default function FlipDashboard({
 
       <Verdict a={pair.a} b={pair.b} coins={coins} pulse={pulse} />
 
-      <HotFlips coins={coins} onLoadPair={loadPair} />
+      <HotFlips rows={hotRows} onLoadPair={loadPair} />
     </>
   );
 }

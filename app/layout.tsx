@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import { getCoins } from "@/lib/coins";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -43,16 +44,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const { isDemoData } = await getCoins();
   return (
     <html
       lang="en"
       className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable}`}
     >
       <body>
-        <Nav />
+        <Nav isDemoData={isDemoData} />
         {children}
-        <Footer />
+        <Footer isDemoData={isDemoData} />
       </body>
     </html>
   );

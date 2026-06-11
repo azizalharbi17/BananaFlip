@@ -110,7 +110,7 @@ export default function CoinPicker({ side, coin, coins, onSelect }: CoinPickerPr
         />
         <ul>
           {results.map((c) => (
-            <li key={c.id}>
+            <li key={c.slug}>
               <button type="button" onClick={() => pick(c)}>
                 <Disc coin={c} />
                 <span className="nm">{c.name}</span>

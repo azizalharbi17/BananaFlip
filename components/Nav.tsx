@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export default function Nav() {
+export default function Nav({ isDemoData }: { isDemoData: boolean }) {
   return (
     <nav>
       <div className="wrap nav-in">
@@ -18,7 +18,7 @@ export default function Nav() {
           <a href="#hot">Hot flips</a>
           <a href="#roi">ROI</a>
         </div>
-        <span className="demo-pill">DEMO DATA</span>
+        {isDemoData && <span className="demo-pill">DEMO DATA</span>}
       </div>
     </nav>
   );

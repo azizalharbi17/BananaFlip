@@ -8,11 +8,13 @@ const YEARS = ["2021", "2022", "2023", "2024", "2025"];
 
 /**
  * Deterministic demo multiplier from the reference — hashes coin + year
- * into a stable "price then" fraction (0.06–0.91 of today's price).
+ * into a stable "price then" fraction (0.06–0.91 of today's price). The
+ * historical figures stay synthetic even with live current prices, hence
+ * the permanent "demo figures" labels on this section.
  */
-function seeded(id: string, year: string): number {
+function seeded(slug: string, year: string): number {
   let h = 0;
-  const s = id + year;
+  const s = slug + year;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return 0.06 + ((h % 1000) / 1000) * 0.85;
 }
@@ -26,7 +28,9 @@ interface RoiResult {
 
 export default function RoiCalculator({ coins }: { coins: RankedCoin[] }) {
   const [amount, setAmount] = useState("100");
-  const [coinId, setCoinId] = useState("sol");
+  const [coinSlug, setCoinSlug] = useState(
+    coins.some((c) => c.slug === "sol") ? "sol" : coins[0]?.slug ?? ""
+  );
   const [year, setYear] = useState("2023");
   const [result, setResult] = useState<RoiResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -39,15 +43,15 @@ export default function RoiCalculator({ coins }: { coins: RankedCoin[] }) {
     const amt = Math.max(1, Number(amount) || 0);
     // Current price comes from the internal coin API (falls back to the
     // server-rendered list if the request fails).
-    let coin = coins.find((c) => c.id === coinId);
+    let coin = coins.find((c) => c.slug === coinSlug);
     try {
-      const r = await fetch(`/api/coin/${coinId}`);
+      const r = await fetch(`/api/coin/${coinSlug}`);
       if (r.ok) coin = ((await r.json()) as { coin: RankedCoin }).coin;
     } catch {
       /* offline — use what we have */
     }
     if (coin) {
-      const then = coin.price * seeded(coin.id, year);
+      const then = coin.price * seeded(coin.slug, year);
       const out = amt * (coin.price / then);
       setResult({ then, now: coin.price, out, gain: out >= amt });
     }
@@ -75,9 +79,13 @@ export default function RoiCalculator({ coins }: { coins: RankedCoin[] }) {
           </div>
           <div className="f-row">
             <label htmlFor="roiCoin">Into</label>
-            <select id="roiCoin" value={coinId} onChange={(e) => setCoinId(e.target.value)}>
+            <select
+              id="roiCoin"
+              value={coinSlug}
+              onChange={(e) => setCoinSlug(e.target.value)}
+            >
               {coins.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option key={c.slug} value={c.slug}>
                   {c.name} ({c.symbol})
                 </option>
               ))}

@@ -1,26 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
 import Disc from "./Disc";
 import { fmtBig, fmtX } from "@/lib/format";
-import { HOT_PAIRS } from "@/lib/pairs";
 import type { RankedCoin } from "@/lib/types";
 
+export interface HotRow {
+  challenger: RankedCoin;
+  target: RankedCoin;
+}
+
 interface HotFlipsProps {
-  coins: RankedCoin[];
+  /** Resolved server-side from HOT_PAIRS so rows survive any list slicing. */
+  rows: HotRow[];
   onLoadPair: (challenger: RankedCoin, target: RankedCoin) => void;
 }
 
-export default function HotFlips({ coins, onLoadPair }: HotFlipsProps) {
-  const rows = useMemo(() => {
-    const byId = new Map(coins.map((c) => [c.id, c]));
-    return HOT_PAIRS.flatMap(({ challengerId, targetId }) => {
-      const c = byId.get(challengerId);
-      const t = byId.get(targetId);
-      return c && t ? [{ c, t }] : [];
-    });
-  }, [coins]);
-
+export default function HotFlips({ rows, onLoadPair }: HotFlipsProps) {
   return (
     <>
       <div className="section-h" id="hot">
@@ -35,9 +30,9 @@ export default function HotFlips({ coins, onLoadPair }: HotFlipsProps) {
           <span className="hide-m">Challenger cap</span>
           <span className="hide-m">Target cap</span>
         </div>
-        {rows.map(({ c, t }, i) => (
+        {rows.map(({ challenger: c, target: t }, i) => (
           <button
-            key={`${c.id}-${t.id}`}
+            key={`${c.slug}-${t.slug}`}
             className="trow"
             type="button"
             onClick={() => onLoadPair(c, t)}
