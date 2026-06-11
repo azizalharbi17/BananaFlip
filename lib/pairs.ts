@@ -1,36 +1,43 @@
-/* Comparison-pair slugs: /pepe-flip-doge ⇄ { challengerId: "pepe", targetId: "doge" } */
+/* Comparison-pair slugs: /pepe-flip-doge ⇄ { challengerSlug: "pepe", targetSlug: "doge" } */
 
-export interface PairIds {
-  challengerId: string;
-  targetId: string;
+export interface PairSlugs {
+  challengerSlug: string;
+  targetSlug: string;
 }
 
-export const DEFAULT_PAIR: PairIds = { challengerId: "pepe", targetId: "doge" };
+export const DEFAULT_PAIR: PairSlugs = { challengerSlug: "pepe", targetSlug: "doge" };
 
 /** Curated pairs for the "Hot flips" table, from design-reference.html. */
-export const HOT_PAIRS: PairIds[] = [
-  { challengerId: "pepe", targetId: "doge" },
-  { challengerId: "doge", targetId: "btc" },
-  { challengerId: "sol", targetId: "eth" },
-  { challengerId: "shib", targetId: "pepe" },
-  { challengerId: "wif", targetId: "bonk" },
-  { challengerId: "xrp", targetId: "eth" },
-  { challengerId: "sui", targetId: "sol" },
+export const HOT_PAIRS: PairSlugs[] = [
+  { challengerSlug: "pepe", targetSlug: "doge" },
+  { challengerSlug: "doge", targetSlug: "btc" },
+  { challengerSlug: "sol", targetSlug: "eth" },
+  { challengerSlug: "shib", targetSlug: "pepe" },
+  { challengerSlug: "wif", targetSlug: "bonk" },
+  { challengerSlug: "xrp", targetSlug: "eth" },
+  { challengerSlug: "sui", targetSlug: "sol" },
 ];
 
-export function pairSlug({ challengerId, targetId }: PairIds): string {
-  return `${challengerId}-flip-${targetId}`;
+export function pairSlug({ challengerSlug, targetSlug }: PairSlugs): string {
+  return `${challengerSlug}-flip-${targetSlug}`;
 }
 
 /**
- * Parse "pepe-flip-doge" → ids. Returns null when the slug is malformed;
- * the caller decides whether the ids actually exist in the dataset.
+ * Coin slugs are lowercase alphanumerics with inner hyphens. They never
+ * contain "-flip-" or end in "-flip" (lib/slugs.ts guarantees it), which
+ * keeps the pair separator unambiguous.
  */
-export function parsePairSlug(slug: string): PairIds | null {
+const COIN_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Parse "pepe-flip-doge" → slugs. Returns null when the URL is malformed;
+ * the caller decides whether the slugs actually exist in the dataset.
+ */
+export function parsePairSlug(slug: string): PairSlugs | null {
   const parts = slug.toLowerCase().split("-flip-");
   if (parts.length !== 2) return null;
-  const [challengerId, targetId] = parts;
-  if (!challengerId || !targetId || challengerId === targetId) return null;
-  if (!/^[a-z0-9]+$/.test(challengerId) || !/^[a-z0-9]+$/.test(targetId)) return null;
-  return { challengerId, targetId };
+  const [challengerSlug, targetSlug] = parts;
+  if (!challengerSlug || !targetSlug || challengerSlug === targetSlug) return null;
+  if (!COIN_SLUG_RE.test(challengerSlug) || !COIN_SLUG_RE.test(targetSlug)) return null;
+  return { challengerSlug, targetSlug };
 }

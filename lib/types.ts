@@ -1,18 +1,30 @@
 export interface Coin {
+  /** Provider id (coinpaprika), e.g. "btc-bitcoin". Demo seed uses the slug. */
   id: string;
+  /** URL key, e.g. "btc". Unique and stable across refreshes. */
+  slug: string;
   name: string;
   symbol: string;
   /** Current price in USD. */
   price: number;
   /** Market capitalization in USD. */
   marketCap: number;
+  /** Circulating supply (not available in the demo seed). */
+  circulatingSupply?: number | null;
   /** Brand color used for the coin disc. */
   color: string;
 }
 
-/** A coin plus its market-cap rank within the dataset (1 = largest). */
+/** A coin plus its market-cap rank (1 = largest). */
 export interface RankedCoin extends Coin {
   rank: number;
+}
+
+/** What getCoins() serves: the ranked list plus where it came from. */
+export interface CoinDataset {
+  coins: RankedCoin[];
+  /** True when serving the bundled seed (Supabase unreachable or empty). */
+  isDemoData: boolean;
 }
 
 export interface CompareResult {

@@ -1,37 +1,130 @@
+import { unstable_cache } from "next/cache";
 import seed from "@/data/coins.json";
-import type { Coin, RankedCoin } from "./types";
+import { getSupabase } from "./supabase";
+import type { CoinDataset, RankedCoin } from "./types";
 
 /**
  * Single data-access point for coin data. Server-side only (API routes,
  * server components, sitemap) — the client talks to /api/* instead.
  *
- * Today this reads the demo seed in data/coins.json. To go live, replace
- * the body with a read from the real store (e.g. Supabase kept fresh by a
- * cron job) — every consumer goes through here, so nothing else changes.
+ * Source of truth is the Supabase `coins` table, kept fresh by
+ * /api/refresh (cron). Reads are cached for 60 seconds. If Supabase is
+ * unconfigured, unreachable, or empty, the bundled demo seed in
+ * data/coins.json is served instead and `isDemoData` is set — the site
+ * never breaks because the data layer is down.
  */
-export async function getCoins(): Promise<Coin[]> {
-  return seed.coins;
+
+const DB_COLUMNS = "id,slug,symbol,name,rank,price,market_cap,circulating_supply,color";
+/** PostgREST caps responses at 1000 rows, so reads are paged. */
+const DB_PAGE = 1000;
+const MAX_COINS = 2000;
+
+interface CoinRow {
+  id: string;
+  slug: string;
+  symbol: string;
+  name: string;
+  rank: number;
+  price: number | string;
+  market_cap: number | string;
+  circulating_supply: number | string | null;
+  color: string;
 }
 
-/** Coins sorted by market cap (desc) with their rank attached. */
+function rowToCoin(row: CoinRow): RankedCoin {
+  return {
+    id: row.id,
+    slug: row.slug,
+    symbol: row.symbol,
+    name: row.name,
+    rank: row.rank,
+    price: Number(row.price),
+    marketCap: Number(row.market_cap),
+    circulatingSupply:
+      row.circulating_supply == null ? null : Number(row.circulating_supply),
+    color: row.color,
+  };
+}
+
+/** The bundled demo seed, ranked by market cap (slug doubles as id). */
+const DEMO_COINS: RankedCoin[] = [...seed.coins]
+  .sort((a, b) => b.marketCap - a.marketCap)
+  .map((c, i) => ({ ...c, slug: c.id, rank: i + 1, circulatingSupply: null }));
+
+const demoDataset = (): CoinDataset => ({ coins: DEMO_COINS, isDemoData: true });
+
+async function fetchDataset(): Promise<CoinDataset> {
+  const supabase = getSupabase();
+  if (!supabase) return demoDataset();
+  try {
+    const rows: CoinRow[] = [];
+    for (let from = 0; rows.length < MAX_COINS; from += DB_PAGE) {
+      const { data, error } = await supabase
+        .from("coins")
+        .select(DB_COLUMNS)
+        .order("rank", { ascending: true })
+        .range(from, from + DB_PAGE - 1);
+      if (error) throw error;
+      rows.push(...(data as CoinRow[]));
+      if (!data || data.length < DB_PAGE) break;
+    }
+    if (rows.length === 0) return demoDataset();
+    return { coins: rows.slice(0, MAX_COINS).map(rowToCoin), isDemoData: false };
+  } catch {
+    return demoDataset();
+  }
+}
+
+/** Cached 60s; the refresh route busts it via revalidateTag("coins"). */
+export const getCoins = unstable_cache(fetchDataset, ["coins-dataset"], {
+  revalidate: 60,
+  tags: ["coins"],
+});
+
 export async function getRankedCoins(): Promise<RankedCoin[]> {
-  const coins = await getCoins();
-  return [...coins]
-    .sort((a, b) => b.marketCap - a.marketCap)
-    .map((coin, i) => ({ ...coin, rank: i + 1 }));
+  return (await getCoins()).coins;
 }
 
-export async function getCoinById(id: string): Promise<RankedCoin | undefined> {
-  const ranked = await getRankedCoins();
-  return ranked.find((c) => c.id === id.toLowerCase());
+export async function getCoinBySlug(slug: string): Promise<RankedCoin | undefined> {
+  const { coins } = await getCoins();
+  return coins.find((c) => c.slug === slug.toLowerCase());
 }
 
-/** Case-insensitive name/symbol match, ranked by market cap. */
-export async function searchCoins(query: string): Promise<RankedCoin[]> {
-  const ranked = await getRankedCoins();
-  const q = query.trim().toLowerCase();
-  if (!q) return ranked;
-  return ranked.filter(
-    (c) => c.name.toLowerCase().includes(q) || c.symbol.toLowerCase().includes(q)
-  );
+/**
+ * Autocomplete search: name or symbol match, best rank first. Queries
+ * Supabase directly; falls back to filtering the cached dataset (which
+ * itself may already be the demo seed) when the query fails.
+ */
+export async function searchCoins(query: string, limit = 20): Promise<RankedCoin[]> {
+  const q = query.trim();
+  if (!q) return (await getRankedCoins()).slice(0, limit);
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      // Strip PostgREST syntax characters before building the or() filter.
+      const safe = q.replace(/[^a-zA-Z0-9 $._-]/g, "");
+      if (safe) {
+        const pattern = `%${safe}%`;
+        const { data, error } = await supabase
+          .from("coins")
+          .select(DB_COLUMNS)
+          .or(`name.ilike.${pattern},symbol.ilike.${pattern}`)
+          .order("rank", { ascending: true })
+          .limit(limit);
+        if (!error && data) return (data as CoinRow[]).map(rowToCoin);
+      }
+    } catch {
+      /* fall through to the cached dataset */
+    }
+  }
+
+  const lower = q.toLowerCase();
+  const { coins } = await getCoins();
+  return coins
+    .filter(
+      (c) =>
+        c.name.toLowerCase().includes(lower) || c.symbol.toLowerCase().includes(lower)
+    )
+    .slice(0, limit);
 }
