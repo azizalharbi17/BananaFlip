@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-cream text-ink font-sans antialiased;
+    /* "ticker paper" dot grain */
+    background-image: radial-gradient(rgba(217, 154, 6, 0.13) 1px, transparent 1.3px);
+    background-size: 22px 22px;
+  }
+
+  ::selection {
+    @apply bg-banana-400 text-ink;
+  }
+
+  :focus-visible {
+    outline: 3px solid theme("colors.banana.500");
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* native date input adopts the theme */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.65;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-blob border-2 border-ink bg-paper shadow-hard;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-ink px-5 py-3 font-display font-bold leading-none transition-[transform,box-shadow,background-color] duration-150;
+  }
+
+  .btn:active {
+    transform: translate(3px, 3px);
+    box-shadow: none !important;
+  }
+
+  .btn-banana {
+    @apply btn bg-banana-400 text-ink shadow-hard hover:bg-banana-300;
+  }
+
+  .btn-ink {
+    @apply btn bg-ink text-banana-100 shadow-hard-banana hover:bg-ink-soft;
+  }
+
+  .btn-ghost {
+    @apply btn border-ink/25 bg-transparent shadow-none hover:border-ink hover:bg-banana-100;
+  }
+
+  .sticker {
+    @apply inline-flex items-center gap-1.5 rounded-xl border-2 border-ink px-2.5 py-1 font-display text-sm font-bold shadow-hard-sm;
+  }
+
+  .stat-label {
+    @apply text-[0.7rem] font-bold uppercase tracking-[0.14em] text-ink-faint;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* peel-burst particles emitted by the flip button */
+  .peel-particle {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    pointer-events: none;
+    animation: peel-burst 0.7s cubic-bezier(0.16, 0.84, 0.44, 1) forwards;
+  }
+
+  @keyframes peel-burst {
+    0% {
+      transform: translate(-50%, -50%) rotate(0deg) translateY(0) scale(0.6);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(-50%, -50%) rotate(var(--spin)) translateY(-58px) scale(1.1);
+      opacity: 0;
+    }
+  }
+
+  .marquee-mask {
+    mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
