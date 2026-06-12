@@ -523,6 +523,55 @@ img.disc {
   box-shadow: none;
 }
 
+.holdings {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.holdings label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.hold-in {
+  width: 130px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 8px 11px;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+.hold-sym {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.hold-arrow {
+  color: var(--faint);
+}
+.hold-out {
+  display: flex;
+  flex-direction: column;
+}
+.hold-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--gold-hi);
+}
+.hold-now {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
 .distance {
   margin-top: 24px;
 }

@@ -7,6 +7,10 @@ import type { RankedCoin } from "@/lib/types";
 
 type VerdictMode = "now" | "ath";
 
+/** Dollar amounts spanning cents to billions: cap-style above $1M,
+ *  price-style below — consistent with the rest of the site. */
+const fmtUsd = (v: number) => (v >= 1e6 ? fmtBig(v) : fmtPrice(v));
+
 interface VerdictProps {
   a: RankedCoin;
   b: RankedCoin;
@@ -19,6 +23,7 @@ interface VerdictProps {
 export default function Verdict({ a, b, coins, pulse }: VerdictProps) {
   const [mode, setMode] = useState<VerdictMode>("now");
   const [modePulse, setModePulse] = useState(0);
+  const [holdAmount, setHoldAmount] = useState("");
 
   // ATH compares against Coin B's all-time-high market cap:
   // ath_market_cap = ath_price × circulating_supply. Without both
@@ -54,6 +59,9 @@ export default function Verdict({ a, b, coins, pulse }: VerdictProps) {
   const alreadyFlipped = multiplier < 1;
 
   const priceText = useCountUp(impliedPrice, fmtPrice, pulse + modePulse);
+
+  const holdings = Number(holdAmount);
+  const hasHoldings = Number.isFinite(holdings) && holdings > 0;
 
   // Log-scale positions, as in the reference. The selection is included in
   // the range (and clamped) since deep-ranked coins sit below the top slice.
@@ -134,6 +142,33 @@ export default function Verdict({ a, b, coins, pulse }: VerdictProps) {
           {isAth ? " at its ATH" : ""}.
         </p>
       )}
+
+      <div className="holdings">
+        <label htmlFor="holdAmt">I hold</label>
+        <input
+          id="holdAmt"
+          className="hold-in"
+          type="number"
+          min={0}
+          step="any"
+          inputMode="decimal"
+          placeholder="1000"
+          value={holdAmount}
+          onChange={(e) => setHoldAmount(e.target.value)}
+        />
+        <span className="hold-sym">{a.symbol}</span>
+        <span className="hold-arrow" aria-hidden="true">
+          →
+        </span>
+        <div className="hold-out">
+          <div className="hold-val">
+            {hasHoldings ? fmtUsd(holdings * impliedPrice) : "—"}
+          </div>
+          {hasHoldings && (
+            <div className="hold-now">now {fmtUsd(holdings * a.price)}</div>
+          )}
+        </div>
+      </div>
 
       <div className="distance">
         <div className="d-lbl">
