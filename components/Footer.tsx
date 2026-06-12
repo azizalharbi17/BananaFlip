@@ -2,7 +2,7 @@ export default function Footer({ isDemoData }: { isDemoData: boolean }) {
   return (
     <footer>
       <div className="wrap foot-in">
-        <span>BANANAFLIP · A BANANAZONE PRODUCT</span>
+        <span>© 2026 BananaZone LLC</span>
         <span>
           {isDemoData
             ? "ALL NUMBERS ARE MOCK DATA"
