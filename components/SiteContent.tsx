@@ -1,3 +1,4 @@
+import DcaTimeMachine from "./DcaTimeMachine";
 import FlipDashboard from "./FlipDashboard";
 import Hero from "./Hero";
 import MoonMath from "./MoonMath";
@@ -40,6 +41,7 @@ export default async function SiteContent({ challenger, target }: SiteContentPro
         />
         <RoiCalculator coins={topCoins} isDemoData={isDemoData} />
         <MoonMath coins={topCoins} isDemoData={isDemoData} />
+        <DcaTimeMachine coins={topCoins} isDemoData={isDemoData} />
       </main>
     </>
   );

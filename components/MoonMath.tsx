@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { fmtPrice, fmtX } from "@/lib/format";
+import { fmtCompact, fmtPct, fmtX } from "@/lib/format";
 import {
   firstEntryOf,
   loadDetail,
@@ -29,35 +29,6 @@ const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000;
 function fmtMultiple(v: number): string {
   if (v >= 100) return Math.round(v).toLocaleString("en-US") + "×";
   return fmtX(v);
-}
-
-/** Compact dollars: $4,252T / $212.1M / $104.4K / $0.0095. */
-function fmtCompact(v: number): string {
-  const units: [number, string][] = [
-    [1e12, "T"],
-    [1e9, "B"],
-    [1e6, "M"],
-    [1e3, "K"],
-  ];
-  for (const [u, s] of units) {
-    if (v >= u) {
-      const x = v / u;
-      const str =
-        x >= 1000
-          ? Math.round(x).toLocaleString("en-US")
-          : x.toFixed(x >= 10 ? 1 : 2);
-      return `$${str}${s}`;
-    }
-  }
-  return fmtPrice(v);
-}
-
-/** Percentages: 5,674% / 16.8% / −3%. */
-function fmtPct(pct: number): string {
-  if (Math.abs(pct) >= 100) {
-    return Math.round(pct).toLocaleString("en-US") + "%";
-  }
-  return pct.toFixed(1).replace(/\.0$/, "") + "%";
 }
 
 interface Pace {

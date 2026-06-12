@@ -63,7 +63,8 @@ function buildDemoDetail(coin: RankedCoin): HistoryDetail {
     }
     years[y] = { months };
   }
-  return { firstYear, lastYear, years };
+  // No synthetic daily series — demo mode hides daily-derived features.
+  return { firstYear, lastYear, years, seriesT: [], seriesC: [] };
 }
 
 interface RoiRun {

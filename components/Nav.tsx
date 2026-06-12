@@ -20,6 +20,7 @@ export default function Nav({ isDemoData }: { isDemoData: boolean }) {
           <a href="#hot">Hot flips</a>
           <a href="#roi">ROI</a>
           <a href="#moon">Moon</a>
+          <a href="#dca">DCA</a>
         </div>
         {isDemoData && <span className="demo-pill">DEMO DATA</span>}
       </div>

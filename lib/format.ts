@@ -23,6 +23,41 @@ export function fmtX(v: number): string {
   return v.toFixed(2).replace(/0$/, "") + "×";
 }
 
+/** Compact dollars: $4,252T / $212.1M / $104.4K / $0.0095. */
+export function fmtCompact(v: number): string {
+  const units: [number, string][] = [
+    [1e12, "T"],
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ];
+  for (const [u, s] of units) {
+    if (v >= u) {
+      const x = v / u;
+      const str =
+        x >= 1000
+          ? Math.round(x).toLocaleString("en-US")
+          : x.toFixed(x >= 10 ? 1 : 2);
+      return `$${str}${s}`;
+    }
+  }
+  return fmtPrice(v);
+}
+
+/** Percentages: 5,674% / 16.8% / -3%. */
+export function fmtPct(pct: number): string {
+  if (Math.abs(pct) >= 100) {
+    return Math.round(pct).toLocaleString("en-US") + "%";
+  }
+  return pct.toFixed(1).replace(/\.0$/, "") + "%";
+}
+
+/** Whole dollars with separators, compact past $1M: $24,532 / $31.2M. */
+export function fmtUsdWhole(v: number): string {
+  if (v >= 1e6) return fmtCompact(v);
+  return "$" + Math.round(v).toLocaleString("en-US");
+}
+
 /** Relative luminance of a hex color — picks the disc text color. */
 export function lum(hex: string): number {
   const x = hex.replace("#", "");

@@ -49,6 +49,10 @@ interface CoinHistory {
   lastYear: number;
   firstDate: string;
   years: Record<number, YearDetail>;
+  /** Compact daily series (post-splice): unix seconds / closes, parallel
+   *  arrays. Powers the DCA time machine without further fetches. */
+  seriesT: number[];
+  seriesC: number[];
 }
 
 /** symbol → history (or null when CryptoCompare has no data). Promises
@@ -161,6 +165,8 @@ async function fetchHistory(symbol: string): Promise<CoinHistory | null> {
     lastYear: Math.max(...yearKeys),
     firstDate: new Date(series[0].time * 1000).toISOString().slice(0, 10),
     years,
+    seriesT: series.map((p) => p.time),
+    seriesC: series.map((p) => p.close),
   };
 }
 
@@ -217,5 +223,7 @@ export async function GET(request: NextRequest) {
     lastYear: history.lastYear,
     firstDate: history.firstDate,
     years: history.years,
+    seriesT: history.seriesT,
+    seriesC: history.seriesC,
   });
 }

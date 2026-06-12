@@ -835,6 +835,24 @@ img.disc.on-light {
   color: var(--faint);
   margin-top: 2px;
 }
+.m-also b {
+  color: var(--muted);
+  font-weight: 700;
+}
+.m-line b.up {
+  color: var(--up);
+}
+.m-line b.down {
+  color: var(--down);
+}
+.dca-vs {
+  margin-top: 14px;
+  border-top: 1px dashed var(--line-soft);
+  padding-top: 10px;
+}
+.dca-vs .m-also {
+  margin-top: 4px;
+}
 .moon-head {
   font-family: var(--font-display);
   font-weight: 700;

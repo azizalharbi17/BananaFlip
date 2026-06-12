@@ -23,6 +23,10 @@ export interface HistoryDetail {
   firstYear: number;
   lastYear: number;
   years: Record<number, YearDetail>;
+  /** Compact daily series (post-splice): unix seconds / closes, parallel
+   *  arrays — real prices for the DCA time machine. */
+  seriesT: number[];
+  seriesC: number[];
 }
 
 const detailCache = new Map<string, Promise<HistoryDetail | null>>();
