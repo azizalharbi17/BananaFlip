@@ -15,19 +15,39 @@ export const dynamic = "force-dynamic";
  * The key is read from CRYPTOCOMPARE_API_KEY; without one this route
  * degrades to {available:false} and the UI shows its unavailable state.
  *
- * GET /api/history?symbol=BTC            → {available, firstYear, lastYear}
- * GET /api/history?symbol=BTC&year=2017  → {available, price, date}
- *
- * "Price then" for a year is the first daily close of that calendar
- * year — Jan 1 for an established coin, the inception-day close for the
- * launch year (Jan 1 closes are immutable, hence the indefinite cache).
+ * GET /api/history?symbol=BTC → the coin's full ROI detail in one shot:
+ *   per year: highest/lowest daily close (+ the best later sell for
+ *   each), and per month: the first daily close plus the highest close
+ *   from that day onward ("sold the top"). Everything the ROI time
+ *   machine needs derives from this single cached payload — month
+ *   changes, the timing spread and the exit toggle cost no further
+ *   upstream calls.
+ * GET /api/history?symbol=BTC&year=2017 → legacy: that year's first
+ *   close, kept for compatibility.
  */
+
+interface MonthEntry {
+  /** First daily close of the month. */
+  price: number;
+  date: string;
+  /** Highest daily close from that day onward. */
+  sellTop: number;
+}
+
+interface YearDetail {
+  high: { price: number; date: string };
+  low: { price: number; date: string };
+  /** Highest close from the year-high / year-low day onward. */
+  highSellTop: number;
+  lowSellTop: number;
+  months: Record<number, MonthEntry>;
+}
 
 interface CoinHistory {
   firstYear: number;
   lastYear: number;
-  /** First close of each calendar year, keyed by year. */
-  closes: Record<number, { price: number; date: string }>;
+  firstDate: string;
+  years: Record<number, YearDetail>;
 }
 
 /** symbol → history (or null when CryptoCompare has no data). Promises
@@ -74,21 +94,60 @@ async function fetchHistory(symbol: string): Promise<CoinHistory | null> {
       start = i;
     }
   }
+  const series = valid.slice(start);
 
-  const closes: CoinHistory["closes"] = {};
-  let firstYear = 0;
-  let lastYear = 0;
-  for (const p of valid.slice(start)) {
-    const d = new Date(p.time * 1000);
-    const year = d.getUTCFullYear();
-    if (!closes[year]) {
-      closes[year] = { price: p.close, date: d.toISOString().slice(0, 10) };
-    }
-    if (!firstYear) firstYear = year;
-    lastYear = year;
+  // Highest close from each day onward, for "sold the top" exits.
+  const suffixMax = new Array<number>(series.length);
+  for (let i = series.length - 1; i >= 0; i--) {
+    suffixMax[i] = Math.max(series[i].close, suffixMax[i + 1] ?? 0);
   }
-  if (!firstYear) return null;
-  return { firstYear, lastYear, closes };
+
+  const years: Record<number, YearDetail> = {};
+  const highIdx: Record<number, number> = {};
+  const lowIdx: Record<number, number> = {};
+  series.forEach((p, i) => {
+    const d = new Date(p.time * 1000);
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth() + 1;
+    const iso = d.toISOString().slice(0, 10);
+    let yd = years[y];
+    if (!yd) {
+      yd = years[y] = {
+        high: { price: p.close, date: iso },
+        low: { price: p.close, date: iso },
+        highSellTop: 0,
+        lowSellTop: 0,
+        months: {},
+      };
+      highIdx[y] = i;
+      lowIdx[y] = i;
+    }
+    if (p.close > yd.high.price) {
+      yd.high = { price: p.close, date: iso };
+      highIdx[y] = i;
+    }
+    if (p.close < yd.low.price) {
+      yd.low = { price: p.close, date: iso };
+      lowIdx[y] = i;
+    }
+    if (!yd.months[m]) {
+      yd.months[m] = { price: p.close, date: iso, sellTop: suffixMax[i] };
+    }
+  });
+  for (const y of Object.keys(years)) {
+    const yd = years[Number(y)];
+    yd.highSellTop = suffixMax[highIdx[Number(y)]];
+    yd.lowSellTop = suffixMax[lowIdx[Number(y)]];
+  }
+
+  const yearKeys = Object.keys(years).map(Number);
+  if (yearKeys.length === 0) return null;
+  return {
+    firstYear: Math.min(...yearKeys),
+    lastYear: Math.max(...yearKeys),
+    firstDate: new Date(series[0].time * 1000).toISOString().slice(0, 10),
+    years,
+  };
 }
 
 function getHistory(symbol: string): Promise<CoinHistory | null> {
@@ -125,17 +184,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ available: false, reason: "no-data" });
   }
 
-  if (yearParam === null) {
-    return NextResponse.json({
-      available: true,
-      firstYear: history.firstYear,
-      lastYear: history.lastYear,
-    });
+  if (yearParam !== null) {
+    // Legacy mode: the year's first close.
+    const yd = history.years[Number(yearParam)];
+    const firstMonth = yd
+      ? Math.min(...Object.keys(yd.months).map(Number))
+      : NaN;
+    const entry = yd?.months[firstMonth];
+    if (!entry) {
+      return NextResponse.json({ available: false, reason: "out-of-range" });
+    }
+    return NextResponse.json({ available: true, price: entry.price, date: entry.date });
   }
 
-  const entry = history.closes[Number(yearParam)];
-  if (!entry) {
-    return NextResponse.json({ available: false, reason: "out-of-range" });
-  }
-  return NextResponse.json({ available: true, price: entry.price, date: entry.date });
+  return NextResponse.json({
+    available: true,
+    firstYear: history.firstYear,
+    lastYear: history.lastYear,
+    firstDate: history.firstDate,
+    years: history.years,
+  });
 }

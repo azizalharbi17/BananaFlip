@@ -97,16 +97,20 @@ The toggle hides for pairs where Coin B has no ATH data.
 
 ### ROI time machine
 
-"Price then" is the first daily close of the selected year (Jan 1 for
-established coins, the inception close for a coin's launch year) from
-CryptoCompare's full history, fetched server-side via `/api/history`
-and cached in memory — one upstream call per coin covers every year.
-The year dropdown adapts to each coin's launch (BTC 2011+, SOL 2021+,
-PEPE 2023+). Requires `CRYPTOCOMPARE_API_KEY` (free at
+Entry is the first daily close of a selected **month + year**, from
+CryptoCompare's full history (`/api/history?symbol=` returns one rich
+per-coin payload — monthly first closes, yearly high/low, and post-entry
+tops — cached in memory; month changes, the timing spread and the exit
+toggle cost no further upstream calls). Month/year options adapt to each
+coin's first available data. The result shows a WORST TIMING / YOUR
+ENTRY / BEST TIMING spread (bought the year's top / your month / the
+year's low), a STILL HOLDING vs SOLD THE TOP exit toggle (sell at the
+highest close after entry), and preset scenario chips (BTC 2013 …
+PEPE 2023). Requires `CRYPTOCOMPARE_API_KEY` (free at
 developers.coindesk.com — the keyless tier was retired); without it, or
 for coins CryptoCompare doesn't track, the calculator shows
-*historical data unavailable for this range*. Demo mode keeps the
-reference's deterministic synthetic figures, labeled as such.
+*historical data unavailable for this range*. Demo mode synthesizes the
+same shapes from seeded figures, labeled as such.
 
 ### Coin logos
 
