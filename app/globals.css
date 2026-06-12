@@ -953,6 +953,22 @@ footer {
   letter-spacing: 0.08em;
   color: var(--faint);
 }
+/* Brand + copyright: one separated line on desktop, stacked on phones
+   where the combined line would wrap mid-phrase. */
+.foot-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+@media (min-width: 781px) {
+  .foot-left {
+    flex-direction: row;
+  }
+  .foot-left span + span::before {
+    content: " · ";
+    white-space: pre;
+  }
+}
 
 @media (max-width: 780px) {
   /* .hero's own padding overrides .wrap's 20px gutter on this shared
