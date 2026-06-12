@@ -112,6 +112,15 @@ for coins CryptoCompare doesn't track, the calculator shows
 *historical data unavailable for this range*. Demo mode synthesizes the
 same shapes from seeded figures, labeled as such.
 
+### Moon math
+
+Target-mode arithmetic — no predictions: amount, coin, target chips or a
+custom target, and a 1–30 year horizon. Shows the required multiple,
+required price, implied market cap with reality anchors (live BTC/ETH
+caps from our DB, approximate gold/Apple constants), and required vs
+historical compound pace (the latter from the same cached history fetch
+the ROI uses; "since launch" when the coin is younger than the horizon).
+
 ### Coin logos
 
 Pickers and the hot-flips table show coinpaprika logos

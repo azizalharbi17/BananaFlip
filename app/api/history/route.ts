@@ -75,11 +75,19 @@ async function fetchHistory(symbol: string): Promise<CoinHistory | null> {
   }
   const body = (await res.json()) as {
     Response?: string;
+    Message?: string;
     Data?: { Data?: { time: number; close: number }[] };
   };
   const points = body?.Data?.Data;
-  // "Error" + no points = unknown symbol — a final answer, cache it.
-  if (!Array.isArray(points) || points.length === 0) return null;
+  if (!Array.isArray(points) || points.length === 0) {
+    // Only an explicit "market does not exist" is a final answer worth
+    // caching; anything else (rate limits, hiccups) must throw so the
+    // cache evicts it and the next request retries — a transient error
+    // here once bricked BTC until restart.
+    const message = body?.Message ?? "";
+    if (/does not exist|invalid/i.test(message)) return null;
+    throw new Error(`cryptocompare empty response: ${message.slice(0, 80)}`);
+  }
 
   const valid = points.filter((p) => p.close > 0); // drop inception padding
   if (valid.length === 0) return null;

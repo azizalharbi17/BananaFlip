@@ -785,6 +785,11 @@ img.disc.on-light {
 .chip:hover {
   background: rgba(245, 185, 18, 0.12);
 }
+.chip.active {
+  background: var(--gold-grad);
+  color: #1a1402;
+  font-weight: 700;
+}
 .roi {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -800,6 +805,26 @@ img.disc.on-light {
 }
 .exit-toggle {
   margin-bottom: 14px;
+}
+.moon-chips {
+  margin: 0 0 8px;
+}
+.moon-years {
+  width: 100%;
+  accent-color: var(--gold);
+  margin-top: 4px;
+}
+.moon-head {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-top: 4px;
+  background: var(--gold-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .card {
   border: 1px solid var(--line);
@@ -900,6 +925,9 @@ img.disc.on-light {
   align-items: baseline;
   padding: 5px 0;
   font-family: var(--font-mono);
+}
+.s-row.two {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 .s-lbl {
   font-size: 0.6rem;

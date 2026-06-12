@@ -1,5 +1,6 @@
 import FlipDashboard from "./FlipDashboard";
 import Hero from "./Hero";
+import MoonMath from "./MoonMath";
 import RoiCalculator from "./RoiCalculator";
 import { getCoins } from "@/lib/coins";
 import { HOT_PAIRS } from "@/lib/pairs";
@@ -38,6 +39,7 @@ export default async function SiteContent({ challenger, target }: SiteContentPro
           hotRows={hotRows}
         />
         <RoiCalculator coins={topCoins} isDemoData={isDemoData} />
+        <MoonMath coins={topCoins} isDemoData={isDemoData} />
       </main>
     </>
   );

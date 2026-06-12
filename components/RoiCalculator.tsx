@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtPrice, fmtX } from "@/lib/format";
+import {
+  firstMonthOf,
+  loadDetail,
+  type HistoryDetail,
+  type MonthEntry,
+  type PricePoint,
+  type YearDetail,
+} from "@/lib/history-client";
 import type { RankedCoin } from "@/lib/types";
 
 const MONTH_LABELS = [
@@ -19,50 +27,6 @@ const PRESETS = [
   { label: "SHIB 2021", slug: "shib", year: 2021 },
   { label: "PEPE 2023", slug: "pepe", year: 2023 },
 ];
-
-interface PricePoint {
-  price: number;
-  date: string;
-  /** Highest daily close from this day onward ("sold the top" exit). */
-  sellTop: number;
-}
-
-interface MonthEntry extends PricePoint {
-  /** Highest / lowest daily close from the entry date to today. */
-  worst: PricePoint;
-  best: PricePoint;
-}
-
-interface YearDetail {
-  months: Record<number, MonthEntry>;
-}
-
-interface HistoryDetail {
-  firstYear: number;
-  lastYear: number;
-  years: Record<number, YearDetail>;
-}
-
-/** One /api/history call per coin per session — month changes, the
- *  spread and the exit toggle all derive from this cached payload. */
-const detailCache = new Map<string, Promise<HistoryDetail | null>>();
-
-function loadDetail(symbol: string): Promise<HistoryDetail | null> {
-  let cached = detailCache.get(symbol);
-  if (!cached) {
-    cached = fetch(`/api/history?symbol=${encodeURIComponent(symbol)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: ({ available: boolean } & HistoryDetail) | null) =>
-        d?.available ? d : null
-      )
-      .catch(() => {
-        detailCache.delete(symbol); // transient — allow a retry
-        return null;
-      });
-    detailCache.set(symbol, cached);
-  }
-  return cached;
-}
 
 /** Demo-mode multiplier from the reference — hashes coin + key into a
  *  stable fraction. Demo mode synthesizes a full detail payload from it
@@ -139,12 +103,6 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
     [coins, coinSlug]
   );
 
-  const firstMonthOf = (d: HistoryDetail, y: number, preferred = 1): number => {
-    const months = d.years[y]?.months ?? {};
-    if (months[preferred]) return preferred;
-    const keys = Object.keys(months).map(Number);
-    return keys.length ? Math.min(...keys) : preferred;
-  };
 
   // One cached detail fetch per coin; everything else is local math.
   useEffect(() => {
