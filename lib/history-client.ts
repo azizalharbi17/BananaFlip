@@ -36,11 +36,20 @@ export function loadDetail(symbol: string): Promise<HistoryDetail | null> {
   if (!cached) {
     cached = fetch(`/api/history?symbol=${encodeURIComponent(symbol)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: ({ available: boolean } & HistoryDetail) | null) =>
-        d?.available ? d : null
+      .then(
+        (
+          d: ({ available: boolean; reason?: string } & HistoryDetail) | null
+        ) => {
+          if (d?.available) return d;
+          // Only a confirmed "this coin has no data" is worth caching.
+          // Transient upstream failures (rate limits, hiccups) must be
+          // evicted, or one bad response bricks the coin all session.
+          if (d?.reason !== "no-data") detailCache.delete(symbol);
+          return null;
+        }
       )
       .catch(() => {
-        detailCache.delete(symbol); // transient — allow a retry
+        detailCache.delete(symbol); // network error — allow a retry
         return null;
       });
     detailCache.set(symbol, cached);

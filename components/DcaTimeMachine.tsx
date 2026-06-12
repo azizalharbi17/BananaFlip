@@ -145,16 +145,18 @@ export default function DcaTimeMachine({ coins, isDemoData }: DcaTimeMachineProp
     };
   }, [coin, isDemoData]);
 
+  // Re-runs on coin switches too: served from the client cache when BTC
+  // already loaded, and retrying when a transient failure was evicted.
   useEffect(() => {
     if (!btc || isDemoData) return;
     let alive = true;
     loadDetail(btc.symbol).then((d) => {
-      if (alive) setBtcDetail(d);
+      if (alive && d) setBtcDetail(d);
     });
     return () => {
       alive = false;
     };
-  }, [btc, isDemoData]);
+  }, [btc, isDemoData, coinSlug]);
 
   const amt = Number(amount) > 0 ? Number(amount) : 100; // default $100
   const startTs = Date.UTC(year, month - 1, 1) / 1000;
