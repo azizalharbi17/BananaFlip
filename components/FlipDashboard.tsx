@@ -153,7 +153,7 @@ export default function FlipDashboard({
       <div className="machine" id="machine">
         <div className="fwrap" ref={fwrapRef}>
           <CoinCard
-            roleLabel="Challenger"
+            roleLabel="Coin A"
             side="A"
             coin={pair.a}
             coins={coins}
@@ -172,7 +172,7 @@ export default function FlipDashboard({
             </button>
           </div>
           <CoinCard
-            roleLabel="Target"
+            roleLabel="Coin B"
             side="B"
             coin={pair.b}
             coins={coins}

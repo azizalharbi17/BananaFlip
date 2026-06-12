@@ -27,8 +27,8 @@ export default function HotFlips({ rows, onLoadPair }: HotFlipsProps) {
           <span>#</span>
           <span>Pair</span>
           <span>Needs</span>
-          <span className="hide-m">Challenger cap</span>
-          <span className="hide-m">Target cap</span>
+          <span className="hide-m">Coin A cap</span>
+          <span className="hide-m">Coin B cap</span>
         </div>
         {rows.map(({ challenger: c, target: t }, i) => (
           <button

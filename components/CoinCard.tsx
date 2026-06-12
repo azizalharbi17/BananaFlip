@@ -5,7 +5,7 @@ import { fmtBig, fmtPrice } from "@/lib/format";
 import type { RankedCoin } from "@/lib/types";
 
 interface CoinCardProps {
-  roleLabel: "Challenger" | "Target";
+  roleLabel: "Coin A" | "Coin B";
   side: "A" | "B";
   coin: RankedCoin;
   coins: RankedCoin[];
