@@ -170,13 +170,22 @@ nav {
   grid-template-columns: 1fr 76px 1fr;
   align-items: stretch;
   perspective: 1400px;
+  /* perspective makes .machine a stacking context, trapping the picker
+     dropdown's z-index inside it. Lift the whole machine above the
+     verdict panel (position:relative, painted later) so an open menu
+     is never covered. */
+  position: relative;
+  z-index: 10;
 }
 .fwrap {
   display: grid;
   grid-template-columns: 1fr 76px 1fr;
   grid-column: 1 / -1;
   transition: transform 0.18s ease-in;
-  transform-style: preserve-3d;
+  /* No preserve-3d: it would put the cards in a 3D rendering context,
+     which breaks z-index between them and traps the picker dropdown
+     behind the second card. .machine's perspective alone gives the
+     flip its depth. */
 }
 .coin-card {
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
@@ -225,6 +234,10 @@ nav {
   font-weight: 700;
   font-size: 0.78rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
+}
+img.disc {
+  object-fit: cover;
+  background: var(--panel-2);
 }
 .pick-name {
   display: flex;
@@ -330,11 +343,16 @@ nav {
   font-weight: 500;
   font-size: 0.9rem;
 }
+.menu .rk {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--faint);
+  margin-left: auto;
+}
 .menu .tk {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--muted);
-  margin-left: auto;
 }
 .menu .empty {
   padding: 10px 8px;

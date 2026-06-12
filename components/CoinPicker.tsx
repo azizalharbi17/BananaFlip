@@ -96,8 +96,8 @@ export default function CoinPicker({ side, coin, coins, onSelect }: CoinPickerPr
           ref={inputRef}
           className="search-in"
           type="text"
-          placeholder="Search coins…"
-          aria-label="Search coins"
+          placeholder="Select a coin…"
+          aria-label="Select a coin"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -114,6 +114,7 @@ export default function CoinPicker({ side, coin, coins, onSelect }: CoinPickerPr
               <button type="button" onClick={() => pick(c)}>
                 <Disc coin={c} />
                 <span className="nm">{c.name}</span>
+                <span className="rk">#{c.rank}</span>
                 <span className="tk">{c.symbol}</span>
               </button>
             </li>
