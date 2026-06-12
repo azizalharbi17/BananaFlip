@@ -956,11 +956,17 @@ footer {
 
 @media (max-width: 780px) {
   /* .hero's own padding overrides .wrap's 20px gutter on this shared
-     element; restore it here so text never touches the screen edge.
-     Desktop keeps the reference's flush-grid look. */
+     element; restore it so text never touches the screen edge. Longhand
+     properties on a header.hero.wrap selector outrank any single-class
+     rule wherever it lands in the cascade. Desktop keeps the
+     reference's flush-grid look. */
   .hero {
     grid-template-columns: 1fr;
-    padding: 38px 20px 8px;
+    padding-top: 38px;
+  }
+  header.hero.wrap {
+    padding-left: 20px;
+    padding-right: 20px;
   }
   .candle-banana {
     display: none;
