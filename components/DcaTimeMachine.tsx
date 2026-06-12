@@ -310,13 +310,13 @@ export default function DcaTimeMachine({ coins, isDemoData }: DcaTimeMachineProp
                 </p>
                 <div className="dca-vs">
                   <p className="m-also">
-                    VS LUMP SUM: investing the whole {fmtUsdWhole(result.invested)} on
-                    day one instead: <b>{fmtUsdWhole(result.lumpWorth)}</b> today
+                    If you&apos;d invested it all on day one:{" "}
+                    <b>{fmtUsdWhole(result.lumpWorth)}</b> today
                   </p>
                   {result.btcWorth !== null && (
                     <p className="m-also">
-                      VS JUST BUYING BTC: the same schedule into BTC:{" "}
-                      <b>{fmtUsdWhole(result.btcWorth)}</b> today
+                      Same plan, but into BTC: <b>{fmtUsdWhole(result.btcWorth)}</b>{" "}
+                      today
                     </p>
                   )}
                 </div>
@@ -325,9 +325,7 @@ export default function DcaTimeMachine({ coins, isDemoData }: DcaTimeMachineProp
           ) : (
             <div className="r-unavail">historical data unavailable for this coin</div>
           )}
-          <div className="r-note">
-            REAL DAILY CLOSES · CRYPTOCOMPARE · PAST ONLY, NOT A FORECAST
-          </div>
+          <div className="r-note">REAL DAILY PRICES · PAST ONLY, NOT A FORECAST</div>
         </div>
       </div>
     </>

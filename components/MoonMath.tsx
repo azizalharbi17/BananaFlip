@@ -19,10 +19,6 @@ const TARGET_CHIPS = [
   { label: "$1M", value: 1_000_000 },
 ];
 
-/** Approximate constants, labeled as such in the footnote. */
-const GOLD_CAP = 23e12;
-const APPLE_CAP = 3.7e12;
-
 const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000;
 
 /** Multiples: 3,333× / 12.4× / 1.3× / 0.4× — commas past 100. */
@@ -121,40 +117,13 @@ export default function MoonMath({ coins, isDemoData }: MoonMathProps) {
   const supply = coin?.circulatingSupply ?? null;
   const impliedCap = supply ? requiredPrice * supply : null;
 
-  // Anchor sentences: gold, Apple, and whichever of BTC/ETH isn't the
-  // selected coin. The headline anchor is the ratio closest to 1× (in
-  // log space) — the most relatable comparison; the rest go on a tiny
-  // "also:" line.
-  const anchors = useMemo(() => {
+  // One anchor: the coin's would-be size against Bitcoin today (against
+  // Ethereum when Bitcoin itself is selected).
+  const anchor = useMemo(() => {
     if (!impliedCap || !coin) return null;
-    const candidates: {
-      tag: string;
-      before: string;
-      value: string;
-      after: string;
-      ratio: number;
-    }[] = [];
-    const push = (tag: string, cap: number, before: string, after: string) => {
-      const ratio = impliedCap / cap;
-      candidates.push({
-        tag: `${fmtMultiple(ratio)} ${tag}`,
-        before: `${coin.name} would be ${before}`,
-        value: fmtMultiple(ratio),
-        after,
-        ratio,
-      });
-    };
-    push("gold", GOLD_CAP, "worth ", " all the gold on Earth");
-    push("Apple", APPLE_CAP, "", " Apple");
-    if (coin.slug !== "btc" && btc) {
-      push("BTC", btc.marketCap, "", " Bitcoin's market cap today");
-    } else if (eth) {
-      push("ETH", eth.marketCap, "", " Ethereum's market cap today");
-    }
-    candidates.sort(
-      (a, b) => Math.abs(Math.log10(a.ratio)) - Math.abs(Math.log10(b.ratio))
-    );
-    return { main: candidates[0], rest: candidates.slice(1) };
+    const ref = coin.slug === "btc" ? eth : btc;
+    if (!ref) return null;
+    return { name: ref.name, ratio: impliedCap / ref.marketCap };
   }, [impliedCap, coin, btc, eth]);
 
   const requiredPacePct =
@@ -260,34 +229,29 @@ export default function MoonMath({ coins, isDemoData }: MoonMathProps) {
               </div>
               <div className="moon-story">
                 <p className="m-line">
-                  1 {coin.symbol} would cost <b>{fmtCompact(requiredPrice)}</b> —
-                  today it&apos;s <b>{fmtCompact(coin.price)}</b>
+                  {coin.symbol} price today: <b>{fmtCompact(coin.price)}</b> →
+                  would need to hit <b>{fmtCompact(requiredPrice)}</b>
                 </p>
-                {anchors && (
-                  <>
-                    <p className="m-line">
-                      {anchors.main.before}
-                      <b>{anchors.main.value}</b>
-                      {anchors.main.after}
-                    </p>
-                    <p className="m-also">
-                      also: {anchors.rest.map((a) => a.tag).join(" · ")}
-                    </p>
-                  </>
+                {anchor && (
+                  <p className="m-line">
+                    That would make {coin.name} worth{" "}
+                    <b>{fmtMultiple(anchor.ratio)}</b> what {anchor.name} is
+                    worth today
+                  </p>
                 )}
                 {requiredPacePct !== null && (
                   <p className="m-line">
-                    Needs <b>{fmtPct(requiredPacePct)}</b> per year for{" "}
-                    {yearsWord(years)}
+                    To get there in {yearsWord(years)}, it would need to grow{" "}
+                    <b>{fmtPct(requiredPacePct)}</b> every year
                   </p>
                 )}
                 {pace && (
                   <p className="m-line">
-                    {coin.symbol}&apos;s actual{" "}
                     {pace.sinceLaunchYears
-                      ? `since launch (${pace.sinceLaunchYears.toFixed(1)}y)`
-                      : `last ${yearsWord(years)}`}
-                    : <b>{fmtPct(pace.pct)}</b> per year
+                      ? `Since launch ${pace.sinceLaunchYears.toFixed(1)} years ago, it actually `
+                      : `Over the last ${years === 1 ? "year" : `${years} years`}, it actually `}
+                    {pace.pct >= 0 ? "grew" : "shrank"}{" "}
+                    <b>{fmtPct(Math.abs(pace.pct))}</b> per year
                   </p>
                 )}
               </div>
@@ -295,9 +259,7 @@ export default function MoonMath({ coins, isDemoData }: MoonMathProps) {
           ) : (
             <div className="r-unavail">enter a target to run the arithmetic</div>
           )}
-          <div className="r-note">
-            {`GOLD ~$23T · APPLE ~$3.7T · APPROX · ARITHMETIC ONLY, NOT A FORECAST`}
-          </div>
+          <div className="r-note">ARITHMETIC ONLY · NOT A FORECAST</div>
         </div>
       </div>
     </>
