@@ -4,13 +4,12 @@ import { useState } from "react";
 import { fmtPrice, fmtX } from "@/lib/format";
 import type { RankedCoin } from "@/lib/types";
 
-const YEARS = ["2021", "2022", "2023", "2024", "2025"];
+const YEARS = ["2021", "2022", "2023", "2024", "2025", "2026"];
 
 /**
- * Deterministic demo multiplier from the reference — hashes coin + year
- * into a stable "price then" fraction (0.06–0.91 of today's price). The
- * historical figures stay synthetic even with live current prices, hence
- * the permanent "demo figures" labels on this section.
+ * Demo-mode multiplier from the reference — hashes coin + year into a
+ * stable "price then" fraction. Only used when the whole site runs on
+ * the demo seed; live mode fetches real Jan 1 prices via /api/history.
  */
 function seeded(slug: string, year: string): number {
   let h = 0;
@@ -19,19 +18,23 @@ function seeded(slug: string, year: string): number {
   return 0.06 + ((h % 1000) / 1000) * 0.85;
 }
 
-interface RoiResult {
-  then: number;
-  now: number;
-  out: number;
-  gain: boolean;
+type RoiResult =
+  | { kind: "ok"; then: number; now: number; out: number; gain: boolean }
+  | { kind: "unavailable" };
+
+interface RoiCalculatorProps {
+  coins: RankedCoin[];
+  isDemoData: boolean;
 }
 
-export default function RoiCalculator({ coins }: { coins: RankedCoin[] }) {
+export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps) {
   const [amount, setAmount] = useState("100");
   const [coinSlug, setCoinSlug] = useState(
     coins.some((c) => c.slug === "sol") ? "sol" : coins[0]?.slug ?? ""
   );
-  const [year, setYear] = useState("2023");
+  // Coinpaprika's free plan only reaches ~1 year back, so default to the
+  // newest year in live mode; the demo keeps the reference's 2023.
+  const [year, setYear] = useState(isDemoData ? "2023" : YEARS[YEARS.length - 1]);
   const [result, setResult] = useState<RoiResult | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -39,30 +42,56 @@ export default function RoiCalculator({ coins }: { coins: RankedCoin[] }) {
     e.preventDefault();
     if (running) return;
     setRunning(true);
-
-    const amt = Math.max(1, Number(amount) || 0);
-    // Current price comes from the internal coin API (falls back to the
-    // server-rendered list if the request fails).
-    let coin = coins.find((c) => c.slug === coinSlug);
     try {
-      const r = await fetch(`/api/coin/${coinSlug}`);
-      if (r.ok) coin = ((await r.json()) as { coin: RankedCoin }).coin;
-    } catch {
-      /* offline — use what we have */
+      const amt = Math.max(1, Number(amount) || 0);
+      let coin = coins.find((c) => c.slug === coinSlug);
+
+      if (isDemoData) {
+        // Demo: deterministic synthetic history, as in the reference.
+        try {
+          const r = await fetch(`/api/coin/${coinSlug}`);
+          if (r.ok) coin = ((await r.json()) as { coin: RankedCoin }).coin;
+        } catch {
+          /* offline — use what we have */
+        }
+        if (coin) {
+          const then = coin.price * seeded(coin.slug, year);
+          const out = amt * (coin.price / then);
+          setResult({ kind: "ok", then, now: coin.price, out, gain: out >= amt });
+        }
+        return;
+      }
+
+      // Live: real Jan 1 close from our history API (cached server-side).
+      const [coinRes, histRes] = await Promise.all([
+        fetch(`/api/coin/${coinSlug}`).catch(() => null),
+        fetch(`/api/history/${coinSlug}?year=${year}`).catch(() => null),
+      ]);
+      if (coinRes?.ok) {
+        coin = ((await coinRes.json()) as { coin: RankedCoin }).coin;
+      }
+      const hist = histRes?.ok
+        ? ((await histRes.json()) as { available: boolean; price?: number })
+        : null;
+
+      if (!coin || !hist?.available || !hist.price) {
+        setResult({ kind: "unavailable" });
+        return;
+      }
+      const out = amt * (coin.price / hist.price);
+      setResult({ kind: "ok", then: hist.price, now: coin.price, out, gain: out >= amt });
+    } finally {
+      setRunning(false);
     }
-    if (coin) {
-      const then = coin.price * seeded(coin.slug, year);
-      const out = amt * (coin.price / then);
-      setResult({ then, now: coin.price, out, gain: out >= amt });
-    }
-    setRunning(false);
   }
+
+  const ok = result?.kind === "ok" ? result : null;
 
   return (
     <>
       <div className="section-h" id="roi">
         <h2>ROI time machine</h2>
-        <span>demo figures</span>
+        <span>{isDemoData ? "demo figures" : "jan 1 price anchors"}</span>
       </div>
       <div className="roi">
         <form className="card" onSubmit={run}>
@@ -106,25 +135,32 @@ export default function RoiCalculator({ coins }: { coins: RankedCoin[] }) {
         <div className="card r-out">
           <div className="r-line">
             <span>Price then</span>
-            <span>{result ? fmtPrice(result.then) : "—"}</span>
+            <span>{ok ? fmtPrice(ok.then) : "—"}</span>
           </div>
           <div className="r-line">
             <span>Price now</span>
-            <span>{result ? fmtPrice(result.now) : "—"}</span>
+            <span>{ok ? fmtPrice(ok.now) : "—"}</span>
           </div>
           <div className="r-line">
             <span>Multiple</span>
-            <span>{result ? fmtX(result.now / result.then) : "—"}</span>
+            <span>{ok ? fmtX(ok.now / ok.then) : "—"}</span>
           </div>
           <div className="r-total">
             <div className="lbl">Worth today</div>
-            <div className={`val${result ? (result.gain ? " gain" : " loss") : ""}`}>
-              {result
-                ? "$" + result.out.toLocaleString("en-US", { maximumFractionDigits: 0 })
+            <div className={`val${ok ? (ok.gain ? " gain" : " loss") : ""}`}>
+              {ok
+                ? "$" + ok.out.toLocaleString("en-US", { maximumFractionDigits: 0 })
                 : "—"}
             </div>
           </div>
-          <div className="r-note">DEMO FIGURES · PROTOTYPE ONLY · NOT FINANCIAL ADVICE</div>
+          {result?.kind === "unavailable" && (
+            <div className="r-unavail">historical data unavailable for this range</div>
+          )}
+          <div className="r-note">
+            {isDemoData
+              ? "DEMO FIGURES · PROTOTYPE ONLY · NOT FINANCIAL ADVICE"
+              : "PRICE THEN = JAN 1 CLOSE · DATA BY COINPAPRIKA · NOT FINANCIAL ADVICE"}
+          </div>
         </div>
       </div>
     </>

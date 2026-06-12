@@ -15,7 +15,7 @@ interface SiteContentProps {
 
 /** Full page body, shared by the homepage and every /a-flip-b pair page. */
 export default async function SiteContent({ challenger, target }: SiteContentProps) {
-  const { coins } = await getCoins();
+  const { coins, isDemoData } = await getCoins();
 
   // The client gets the top slice, not all ~2000 coins — search covers the
   // rest. Hot-flip rows are resolved here so they never depend on the slice.
@@ -37,7 +37,7 @@ export default async function SiteContent({ challenger, target }: SiteContentPro
           initialTarget={target}
           hotRows={hotRows}
         />
-        <RoiCalculator coins={topCoins} />
+        <RoiCalculator coins={topCoins} isDemoData={isDemoData} />
       </main>
     </>
   );

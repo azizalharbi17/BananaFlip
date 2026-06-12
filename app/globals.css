@@ -740,6 +740,13 @@ img.disc {
 .r-total .val.loss {
   color: var(--down);
 }
+.r-unavail {
+  margin-top: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
 .r-note {
   margin-top: 12px;
   font-family: var(--font-mono);
