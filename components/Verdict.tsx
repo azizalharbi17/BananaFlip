@@ -144,29 +144,33 @@ export default function Verdict({ a, b, coins, pulse }: VerdictProps) {
       )}
 
       <div className="holdings">
-        <label htmlFor="holdAmt">I hold</label>
-        <input
-          id="holdAmt"
-          className="hold-in"
-          type="number"
-          min={0}
-          step="any"
-          inputMode="decimal"
-          placeholder="1000"
-          value={holdAmount}
-          onChange={(e) => setHoldAmount(e.target.value)}
-        />
-        <span className="hold-sym">{a.symbol}</span>
-        <span className="hold-arrow" aria-hidden="true">
-          →
-        </span>
-        <div className="hold-out">
+        <div className="hold-field">
+          <label htmlFor="holdAmt">If I hold</label>
+          <div className="hold-row">
+            <input
+              id="holdAmt"
+              className="hold-in"
+              type="number"
+              min={0}
+              step="any"
+              inputMode="decimal"
+              placeholder="1000"
+              value={holdAmount}
+              onChange={(e) => setHoldAmount(e.target.value)}
+            />
+            <span className="hold-sym">{a.symbol}</span>
+          </div>
+        </div>
+        <div className="hold-result">
+          <div className="lbl">Estimated value</div>
           <div className="hold-val">
             {hasHoldings ? fmtUsd(holdings * impliedPrice) : "—"}
           </div>
-          {hasHoldings && (
-            <div className="hold-now">now {fmtUsd(holdings * a.price)}</div>
-          )}
+          <div className="hold-now">
+            {hasHoldings
+              ? `now ${fmtUsd(holdings * a.price)}`
+              : "at the hypothetical price"}
+          </div>
         </div>
       </div>
 
