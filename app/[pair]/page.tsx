@@ -70,12 +70,15 @@ export async function generateMetadata({ params }: PairPageProps): Promise<Metad
     description,
     alternates: { canonical },
     openGraph: {
+      // Child openGraph replaces the layout's — restate the site fields.
+      siteName: "BananaFlip",
+      type: "website",
       title: `${title} — BananaFlip`,
       description,
       url: canonical,
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: `${title} — BananaFlip`,
       description,
     },

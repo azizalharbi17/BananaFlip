@@ -38,9 +38,10 @@ export const metadata: Metadata = {
   openGraph: {
     siteName: "BananaFlip",
     type: "website",
+    url: "/",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
   },
 };
 
