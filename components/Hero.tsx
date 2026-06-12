@@ -7,8 +7,8 @@ export default function Hero() {
           Run the market-cap math.
         </h1>
         <p>
-          Pick a challenger and a target. BananaFlip shows the challenger&apos;s price at
-          the target&apos;s market cap — and how many ×&apos;s away the flippening is.
+          Pick two coins. BananaFlip shows Coin A&apos;s price at Coin B&apos;s market
+          cap — and how many ×&apos;s away the flip is.
         </p>
       </div>
       {/* signature: banana drawn as an ascending candlestick arc */}

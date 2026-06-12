@@ -1,8 +1,8 @@
 # 🍌 BananaFlip
 
-**Can it flip?** A crypto market-cap comparison tool. Pick a challenger and a
-target coin — BananaFlip shows the challenger's price at the target's market
-cap, and how many ×'s away the flippening is.
+**Can it flip?** A crypto market-cap comparison tool. Pick two coins —
+BananaFlip shows Coin A's price at Coin B's market cap, and how many ×'s
+away the flip is.
 
 ```
 impliedPrice = priceA × (mcapB / mcapA)
@@ -110,7 +110,8 @@ colored monogram disc on load errors and in demo mode.
 
 ## Shareable flip pages
 
-Every comparison has a canonical URL: **`/<challenger>-flip-<target>`**.
+Every comparison has a canonical URL: **`/<coinA>-flip-<coinB>`**
+(the API keeps `challenger`/`target` as its query-param names).
 Hot pairs and the top-10 permutations are statically generated; any other
 valid pair renders on first request and is cached (ISR, 60 s). Each page
 gets its own `<title>`, meta description, canonical and OpenGraph tags.

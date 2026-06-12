@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     template: "%s — BananaFlip",
   },
   description:
-    "Can it flip? Pick a challenger and a target coin — BananaFlip shows the challenger's price at the target's market cap, and how many ×'s away the flippening is.",
+    "Can it flip? Pick two coins — BananaFlip shows Coin A's price at Coin B's market cap, and how many ×'s away the flip is.",
   openGraph: {
     siteName: "BananaFlip",
     type: "website",
