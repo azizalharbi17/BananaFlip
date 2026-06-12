@@ -20,19 +20,21 @@ const PRESETS = [
   { label: "PEPE 2023", slug: "pepe", year: 2023 },
 ];
 
-interface EntryPoint {
+interface PricePoint {
   price: number;
   date: string;
-  /** Highest daily close from the entry day onward. */
+  /** Highest daily close from this day onward ("sold the top" exit). */
   sellTop: number;
 }
 
+interface MonthEntry extends PricePoint {
+  /** Highest / lowest daily close from the entry date to today. */
+  worst: PricePoint;
+  best: PricePoint;
+}
+
 interface YearDetail {
-  high: { price: number; date: string };
-  low: { price: number; date: string };
-  highSellTop: number;
-  lowSellTop: number;
-  months: Record<number, EntryPoint>;
+  months: Record<number, MonthEntry>;
 }
 
 interface HistoryDetail {
@@ -81,24 +83,21 @@ function buildDemoDetail(coin: RankedCoin): HistoryDetail {
     for (let m = 1; m <= 12; m++) {
       monthPrices.push(coin.price * seeded(coin.slug, `${y}-${m}`));
     }
-    const high = Math.max(...monthPrices) * 1.12;
-    const low = Math.min(...monthPrices) * 0.88;
     const months: YearDetail["months"] = {};
     for (let m = 1; m <= 12; m++) {
-      const suffixHigh = Math.max(...monthPrices.slice(m - 1)) * 1.12;
+      const window = monthPrices.slice(m - 1);
+      const worstPrice = Math.max(...window) * 1.12;
+      const bestPrice = Math.min(...window) * 0.88;
+      const date = (mm: number) => `${y}-${String(mm).padStart(2, "0")}-01`;
       months[m] = {
         price: monthPrices[m - 1],
-        date: `${y}-${String(m).padStart(2, "0")}-01`,
-        sellTop: Math.max(monthPrices[m - 1], suffixHigh),
+        date: date(m),
+        sellTop: Math.max(monthPrices[m - 1], worstPrice),
+        worst: { price: worstPrice, date: date(m), sellTop: worstPrice },
+        best: { price: bestPrice, date: date(m), sellTop: worstPrice },
       };
     }
-    years[y] = {
-      high: { price: high, date: `${y}-06-15` },
-      low: { price: low, date: `${y}-11-15` },
-      highSellTop: high,
-      lowSellTop: high,
-      months,
-    };
+    years[y] = { months };
   }
   return { firstYear, lastYear, years };
 }
@@ -106,9 +105,9 @@ function buildDemoDetail(coin: RankedCoin): HistoryDetail {
 interface RoiRun {
   amt: number;
   current: number;
-  entry: EntryPoint;
-  high: EntryPoint;
-  low: EntryPoint;
+  entry: MonthEntry;
+  /** "Nov 2024" — frozen at run time for the spread row labels. */
+  sinceLabel: string;
 }
 
 type RoiResult = { kind: "ok"; run: RoiRun } | { kind: "unavailable" };
@@ -184,9 +183,8 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
       } catch {
         /* offline — use the server-rendered price */
       }
-      const yd = d?.years[runYear];
-      const entry = yd?.months[runMonth];
-      if (!current || !yd || !entry) {
+      const entry = d?.years[runYear]?.months[runMonth];
+      if (!current || !entry) {
         setResult({ kind: "unavailable" });
         return;
       }
@@ -196,8 +194,7 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
           amt,
           current: current.price,
           entry,
-          high: { ...yd.high, sellTop: yd.highSellTop },
-          low: { ...yd.low, sellTop: yd.lowSellTop },
+          sinceLabel: `${MONTH_LABELS[runMonth - 1]} ${runYear}`,
         },
       });
     } finally {
@@ -236,8 +233,8 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
   }, [detail, detailFor, detailLoading, coin]);
 
   const run_ = result?.kind === "ok" ? result.run : null;
-  const sellFor = (e: EntryPoint) => (soldTop ? e.sellTop : run_?.current ?? 0);
-  const worthOf = (e: EntryPoint) => (run_ ? (run_.amt * sellFor(e)) / e.price : 0);
+  const sellFor = (e: PricePoint) => (soldTop ? e.sellTop : run_?.current ?? 0);
+  const worthOf = (e: PricePoint) => (run_ ? (run_.amt * sellFor(e)) / e.price : 0);
 
   const yearOptions = detail
     ? Object.keys(detail.years)
@@ -386,9 +383,9 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
             <div className="spread">
               {(
                 [
-                  ["Worst timing", run_.high],
+                  [`Worst buy since ${run_.sinceLabel}`, run_.entry.worst],
                   ["Your entry", run_.entry],
-                  ["Best timing", run_.low],
+                  [`Best buy since ${run_.sinceLabel}`, run_.entry.best],
                 ] as const
               ).map(([label, point]) => (
                 <div className="s-row" key={label}>

@@ -26,20 +26,21 @@ export const dynamic = "force-dynamic";
  *   close, kept for compatibility.
  */
 
-interface MonthEntry {
-  /** First daily close of the month. */
+interface PricePoint {
   price: number;
   date: string;
-  /** Highest daily close from that day onward. */
+  /** Highest daily close from this day onward ("sold the top" exit). */
   sellTop: number;
 }
 
+interface MonthEntry extends PricePoint {
+  /** Highest daily close from the entry date to today. */
+  worst: PricePoint;
+  /** Lowest daily close from the entry date to today. */
+  best: PricePoint;
+}
+
 interface YearDetail {
-  high: { price: number; date: string };
-  low: { price: number; date: string };
-  /** Highest close from the year-high / year-low day onward. */
-  highSellTop: number;
-  lowSellTop: number;
   months: Record<number, MonthEntry>;
 }
 
@@ -96,49 +97,54 @@ async function fetchHistory(symbol: string): Promise<CoinHistory | null> {
   }
   const series = valid.slice(start);
 
-  // Highest close from each day onward, for "sold the top" exits.
-  const suffixMax = new Array<number>(series.length);
-  for (let i = series.length - 1; i >= 0; i--) {
-    suffixMax[i] = Math.max(series[i].close, suffixMax[i + 1] ?? 0);
+  // One backward pass: for every day, the highest close from there to
+  // today (sold-the-top exits) plus the indices of the forward-window
+  // high and low (>=/<= keep the earliest date on ties). The spread for
+  // any entry month then reads straight off the entry's index — worst
+  // buy = the window high (whose own sellTop is itself, so buying the
+  // absolute top sells at ~1.0×), best buy = the window low.
+  const n = series.length;
+  const suffixMax = new Array<number>(n);
+  const suffixHighIdx = new Array<number>(n);
+  const suffixLowIdx = new Array<number>(n);
+  let hi = -Infinity;
+  let hiIdx = n - 1;
+  let lo = Infinity;
+  let loIdx = n - 1;
+  for (let i = n - 1; i >= 0; i--) {
+    if (series[i].close >= hi) {
+      hi = series[i].close;
+      hiIdx = i;
+    }
+    if (series[i].close <= lo) {
+      lo = series[i].close;
+      loIdx = i;
+    }
+    suffixMax[i] = hi;
+    suffixHighIdx[i] = hiIdx;
+    suffixLowIdx[i] = loIdx;
   }
+  const pointAt = (i: number): PricePoint => ({
+    price: series[i].close,
+    date: new Date(series[i].time * 1000).toISOString().slice(0, 10),
+    sellTop: suffixMax[i],
+  });
 
   const years: Record<number, YearDetail> = {};
-  const highIdx: Record<number, number> = {};
-  const lowIdx: Record<number, number> = {};
   series.forEach((p, i) => {
     const d = new Date(p.time * 1000);
     const y = d.getUTCFullYear();
     const m = d.getUTCMonth() + 1;
-    const iso = d.toISOString().slice(0, 10);
     let yd = years[y];
-    if (!yd) {
-      yd = years[y] = {
-        high: { price: p.close, date: iso },
-        low: { price: p.close, date: iso },
-        highSellTop: 0,
-        lowSellTop: 0,
-        months: {},
-      };
-      highIdx[y] = i;
-      lowIdx[y] = i;
-    }
-    if (p.close > yd.high.price) {
-      yd.high = { price: p.close, date: iso };
-      highIdx[y] = i;
-    }
-    if (p.close < yd.low.price) {
-      yd.low = { price: p.close, date: iso };
-      lowIdx[y] = i;
-    }
+    if (!yd) yd = years[y] = { months: {} };
     if (!yd.months[m]) {
-      yd.months[m] = { price: p.close, date: iso, sellTop: suffixMax[i] };
+      yd.months[m] = {
+        ...pointAt(i),
+        worst: pointAt(suffixHighIdx[i]),
+        best: pointAt(suffixLowIdx[i]),
+      };
     }
   });
-  for (const y of Object.keys(years)) {
-    const yd = years[Number(y)];
-    yd.highSellTop = suffixMax[highIdx[Number(y)]];
-    yd.lowSellTop = suffixMax[lowIdx[Number(y)]];
-  }
 
   const yearKeys = Object.keys(years).map(Number);
   if (yearKeys.length === 0) return null;
