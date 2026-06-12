@@ -84,7 +84,29 @@ a stable mid-tone color hashed from its symbol ([lib/colors.ts](lib/colors.ts)).
 | `GET /api/search?q=do` | Coins matching name/symbol, best rank first (limit 20) |
 | `GET /api/coin/:slug` | One coin with its market-cap rank |
 | `GET /api/compare?challenger=pepe&target=doge` | Implied price, multiplier, cap gap, already-flipped flag |
+| `GET /api/history/:slug?year=2026` | The coin's Jan 1 close for that year, or `{available:false}` |
 | `GET/POST /api/refresh` | Cron-only data refresh (bearer auth) |
+
+### NOW / ATH toggle
+
+The verdict panel can compare against Coin B's **all-time-high** market cap
+(`ath_price × circulating_supply`; `ath_price` comes from the refresh and
+needs [supabase/migrations/0002_add_ath_price.sql](supabase/migrations/0002_add_ath_price.sql)).
+The toggle hides for pairs where Coin B has no ATH data.
+
+### ROI time machine
+
+"Price then" is the real Jan 1 close from coinpaprika's historical
+endpoint, fetched server-side via `/api/history` and cached for 30 days.
+The free plan only serves the trailing 365 days, so out-of-window years
+show *historical data unavailable for this range*. Demo mode keeps the
+reference's deterministic synthetic figures, labeled as such.
+
+### Coin logos
+
+Pickers and the hot-flips table show coinpaprika logos
+(`static.coinpaprika.com/coin/{id}/logo.png`), falling back to the
+colored monogram disc on load errors and in demo mode.
 
 ## Shareable flip pages
 
