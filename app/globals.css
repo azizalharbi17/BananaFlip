@@ -411,6 +411,39 @@ img.disc {
   text-transform: uppercase;
   color: var(--faint);
 }
+.v-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.mode-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.mode-toggle button {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  line-height: 1;
+}
+.mode-toggle button:hover {
+  color: var(--gold-hi);
+}
+.mode-toggle button.active {
+  background: var(--gold-grad);
+  color: #1a1402;
+  font-weight: 700;
+}
 .v-line {
   display: flex;
   flex-wrap: wrap;

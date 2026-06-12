@@ -134,12 +134,9 @@ export default function FlipDashboard({
           if (prev.a.slug !== data.challenger.slug || prev.b.slug !== data.target.slug) {
             return prev; // stale response — the pair moved on
           }
-          const unchanged =
-            prev.a.price === data.challenger.price &&
-            prev.a.marketCap === data.challenger.marketCap &&
-            prev.b.price === data.target.price &&
-            prev.b.marketCap === data.target.marketCap;
-          return unchanged ? prev : { a: data.challenger, b: data.target };
+          // Adopt the server objects unconditionally: ISR-cached page props
+          // can lag the API by a data generation (prices, ATH fields).
+          return { a: data.challenger, b: data.target };
         });
       })
       .catch(() => {

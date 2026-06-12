@@ -9,8 +9,10 @@ export interface Coin {
   price: number;
   /** Market capitalization in USD. */
   marketCap: number;
-  /** Circulating supply (not available in the demo seed). */
+  /** Circulating supply (derived as marketCap/price for the demo seed). */
   circulatingSupply?: number | null;
+  /** All-time-high price in USD; null when the provider has none. */
+  athPrice?: number | null;
   /** Brand color used for the coin disc. */
   color: string;
 }

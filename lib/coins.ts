@@ -14,7 +14,8 @@ import type { CoinDataset, RankedCoin } from "./types";
  * never breaks because the data layer is down.
  */
 
-const DB_COLUMNS = "id,slug,symbol,name,rank,price,market_cap,circulating_supply,color";
+const DB_COLUMNS =
+  "id,slug,symbol,name,rank,price,market_cap,circulating_supply,ath_price,color";
 /** PostgREST caps responses at 1000 rows, so reads are paged. */
 const DB_PAGE = 1000;
 const MAX_COINS = 2000;
@@ -28,6 +29,7 @@ interface CoinRow {
   price: number | string;
   market_cap: number | string;
   circulating_supply: number | string | null;
+  ath_price: number | string | null;
   color: string;
 }
 
@@ -42,14 +44,24 @@ function rowToCoin(row: CoinRow): RankedCoin {
     marketCap: Number(row.market_cap),
     circulatingSupply:
       row.circulating_supply == null ? null : Number(row.circulating_supply),
+    athPrice: row.ath_price == null ? null : Number(row.ath_price),
     color: row.color,
   };
 }
 
-/** The bundled demo seed, ranked by market cap (slug doubles as id). */
+/**
+ * The bundled demo seed, ranked by market cap (slug doubles as id).
+ * Circulating supply is implied by marketCap/price, keeping the demo
+ * ATH math consistent with the live formula.
+ */
 const DEMO_COINS: RankedCoin[] = [...seed.coins]
   .sort((a, b) => b.marketCap - a.marketCap)
-  .map((c, i) => ({ ...c, slug: c.id, rank: i + 1, circulatingSupply: null }));
+  .map((c, i) => ({
+    ...c,
+    slug: c.id,
+    rank: i + 1,
+    circulatingSupply: c.marketCap / c.price,
+  }));
 
 const demoDataset = (): CoinDataset => ({ coins: DEMO_COINS, isDemoData: true });
 

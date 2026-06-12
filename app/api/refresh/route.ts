@@ -18,7 +18,7 @@ interface PaprikaTicker {
   symbol: string;
   rank: number;
   circulating_supply?: number;
-  quotes?: { USD?: { price?: number; market_cap?: number } };
+  quotes?: { USD?: { price?: number; market_cap?: number; ath_price?: number } };
 }
 
 /**
@@ -100,15 +100,22 @@ async function refresh(request: Request): Promise<NextResponse> {
       slug = assignSlug(t, taken);
       taken.add(slug);
     }
+    const price = t.quotes!.USD!.price ?? 0;
+    const marketCap = t.quotes!.USD!.market_cap!;
+    // coinpaprika often sends circulating_supply: null; market_cap/price
+    // IS the circulating supply by definition, so derive it then.
+    const circulating =
+      t.circulating_supply ?? (price > 0 ? marketCap / price : null);
     return {
       id: t.id,
       slug,
       symbol: t.symbol,
       name: t.name,
       rank: t.rank,
-      price: t.quotes!.USD!.price ?? 0,
-      market_cap: t.quotes!.USD!.market_cap!,
-      circulating_supply: t.circulating_supply ?? null,
+      price,
+      market_cap: marketCap,
+      circulating_supply: circulating,
+      ath_price: t.quotes!.USD!.ath_price ?? null,
       color: colorForCoin(slug, t.symbol),
       updated_at: now,
     };
