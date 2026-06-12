@@ -814,6 +814,27 @@ img.disc.on-light {
   accent-color: var(--gold);
   margin-top: 4px;
 }
+.moon-story {
+  margin-top: 16px;
+}
+.m-line {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin-top: 8px;
+}
+.m-line b {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text);
+}
+.m-also {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  margin-top: 2px;
+}
 .moon-head {
   font-family: var(--font-display);
   font-weight: 700;

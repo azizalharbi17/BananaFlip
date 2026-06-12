@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { fmtBig, fmtPrice, fmtX } from "@/lib/format";
+import { fmtPrice, fmtX } from "@/lib/format";
 import {
   firstEntryOf,
   loadDetail,
@@ -19,23 +19,49 @@ const TARGET_CHIPS = [
   { label: "$1M", value: 1_000_000 },
 ];
 
-/** Hardcoded reality anchors, deliberately approximate. */
-const APPROX_ANCHORS = [
-  { label: "GOLD", cap: 23e12 },
-  { label: "APPLE", cap: 3.7e12 },
-];
+/** Approximate constants, labeled as such in the footnote. */
+const GOLD_CAP = 23e12;
+const APPLE_CAP = 3.7e12;
 
 const MS_PER_YEAR = 365.25 * 24 * 3600 * 1000;
 
-/** Compound rate per year for a total multiple over a span, as text. */
-function fmtPace(multiple: number, years: number): string {
-  const pct = (Math.pow(multiple, 1 / years) - 1) * 100;
-  const digits = Math.abs(pct) >= 100 ? 0 : 1;
-  return `${pct.toFixed(digits)}%/yr`;
+/** Multiples: 3,333× / 12.4× / 1.3× / 0.4× — commas past 100. */
+function fmtMultiple(v: number): string {
+  if (v >= 100) return Math.round(v).toLocaleString("en-US") + "×";
+  return fmtX(v);
+}
+
+/** Compact dollars: $4,252T / $212.1M / $104.4K / $0.0095. */
+function fmtCompact(v: number): string {
+  const units: [number, string][] = [
+    [1e12, "T"],
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ];
+  for (const [u, s] of units) {
+    if (v >= u) {
+      const x = v / u;
+      const str =
+        x >= 1000
+          ? Math.round(x).toLocaleString("en-US")
+          : x.toFixed(x >= 10 ? 1 : 2);
+      return `$${str}${s}`;
+    }
+  }
+  return fmtPrice(v);
+}
+
+/** Percentages: 5,674% / 16.8% / −3%. */
+function fmtPct(pct: number): string {
+  if (Math.abs(pct) >= 100) {
+    return Math.round(pct).toLocaleString("en-US") + "%";
+  }
+  return pct.toFixed(1).replace(/\.0$/, "") + "%";
 }
 
 interface Pace {
-  text: string;
+  pct: number;
   /** Set when the coin is younger than the horizon. */
   sinceLaunchYears: number | null;
 }
@@ -72,7 +98,7 @@ function historicalPace(
   const span = (now - Date.parse(`${then.date}T00:00:00Z`)) / MS_PER_YEAR;
   if (span < 0.1 || then.price <= 0) return null;
   return {
-    text: fmtPace(currentPrice / then.price, span),
+    pct: (Math.pow(currentPrice / then.price, 1 / span) - 1) * 100,
     sinceLaunchYears: youngerThanHorizon ? span : null,
   };
 }
@@ -98,9 +124,9 @@ export default function MoonMath({ coins, isDemoData }: MoonMathProps) {
   const btc = useMemo(() => coins.find((c) => c.slug === "btc"), [coins]);
   const eth = useMemo(() => coins.find((c) => c.slug === "eth"), [coins]);
 
-  // The pace row reuses the ROI's cached history fetch — one call per
-  // coin per session, nothing per interaction. Demo mode has no real
-  // history, so the row simply hides.
+  // The historical line reuses the ROI's cached history fetch — one call
+  // per coin per session, nothing per interaction. Demo mode has no real
+  // history, so that line simply hides.
   useEffect(() => {
     if (!coin || isDemoData) {
       setDetail(null);
@@ -124,18 +150,49 @@ export default function MoonMath({ coins, isDemoData }: MoonMathProps) {
   const supply = coin?.circulatingSupply ?? null;
   const impliedCap = supply ? requiredPrice * supply : null;
 
-  const anchors = impliedCap
-    ? [
-        ...(btc ? [{ label: "BTC", cap: btc.marketCap }] : []),
-        ...(eth ? [{ label: "ETH", cap: eth.marketCap }] : []),
-        ...APPROX_ANCHORS,
-      ].map((a) => `${fmtX(impliedCap / a.cap)} ${a.label}`)
-    : null;
+  // Anchor sentences: gold, Apple, and whichever of BTC/ETH isn't the
+  // selected coin. The headline anchor is the ratio closest to 1× (in
+  // log space) — the most relatable comparison; the rest go on a tiny
+  // "also:" line.
+  const anchors = useMemo(() => {
+    if (!impliedCap || !coin) return null;
+    const candidates: {
+      tag: string;
+      before: string;
+      value: string;
+      after: string;
+      ratio: number;
+    }[] = [];
+    const push = (tag: string, cap: number, before: string, after: string) => {
+      const ratio = impliedCap / cap;
+      candidates.push({
+        tag: `${fmtMultiple(ratio)} ${tag}`,
+        before: `${coin.name} would be ${before}`,
+        value: fmtMultiple(ratio),
+        after,
+        ratio,
+      });
+    };
+    push("gold", GOLD_CAP, "worth ", " all the gold on Earth");
+    push("Apple", APPLE_CAP, "", " Apple");
+    if (coin.slug !== "btc" && btc) {
+      push("BTC", btc.marketCap, "", " Bitcoin's market cap today");
+    } else if (eth) {
+      push("ETH", eth.marketCap, "", " Ethereum's market cap today");
+    }
+    candidates.sort(
+      (a, b) => Math.abs(Math.log10(a.ratio)) - Math.abs(Math.log10(b.ratio))
+    );
+    return { main: candidates[0], rest: candidates.slice(1) };
+  }, [impliedCap, coin, btc, eth]);
 
+  const requiredPacePct =
+    multiple > 1 ? (Math.pow(multiple, 1 / years) - 1) * 100 : null;
   const pace =
     detail && coin && !alreadyThere && multiple > 1
       ? historicalPace(detail, coin.price, years)
       : null;
+  const yearsWord = (n: number) => (n === 1 ? "1 year" : `${n} years`);
 
   return (
     <>
@@ -146,7 +203,7 @@ export default function MoonMath({ coins, isDemoData }: MoonMathProps) {
       <div className="roi">
         <div className="card">
           <div className="f-row">
-            <label htmlFor="moonAmt">If you&apos;d put in (USD)</label>
+            <label htmlFor="moonAmt">You put in (USD)</label>
             <input
               id="moonAmt"
               type="number"
@@ -172,7 +229,7 @@ export default function MoonMath({ coins, isDemoData }: MoonMathProps) {
             </select>
           </div>
           <div className="f-row">
-            <label htmlFor="moonTarget">Target</label>
+            <label htmlFor="moonTarget">You want</label>
             <div className="chips moon-chips">
               {TARGET_CHIPS.map((c) => (
                 <button
@@ -226,40 +283,43 @@ export default function MoonMath({ coins, isDemoData }: MoonMathProps) {
                 <div className="lbl">
                   ${amt.toLocaleString("en-US")} → ${targetNum.toLocaleString("en-US")}
                 </div>
-                <div className="moon-head">Needs a {fmtX(multiple)}</div>
+                <div className="moon-head">
+                  {coin.symbol} needs a {fmtMultiple(multiple)}
+                </div>
               </div>
-              <div className="r-line">
-                <span>Required {coin.symbol} price</span>
-                <span>{fmtPrice(requiredPrice)}</span>
+              <div className="moon-story">
+                <p className="m-line">
+                  1 {coin.symbol} would cost <b>{fmtCompact(requiredPrice)}</b> —
+                  today it&apos;s <b>{fmtCompact(coin.price)}</b>
+                </p>
+                {anchors && (
+                  <>
+                    <p className="m-line">
+                      {anchors.main.before}
+                      <b>{anchors.main.value}</b>
+                      {anchors.main.after}
+                    </p>
+                    <p className="m-also">
+                      also: {anchors.rest.map((a) => a.tag).join(" · ")}
+                    </p>
+                  </>
+                )}
+                {requiredPacePct !== null && (
+                  <p className="m-line">
+                    Needs <b>{fmtPct(requiredPacePct)}</b> per year for{" "}
+                    {yearsWord(years)}
+                  </p>
+                )}
+                {pace && (
+                  <p className="m-line">
+                    {coin.symbol}&apos;s actual{" "}
+                    {pace.sinceLaunchYears
+                      ? `since launch (${pace.sinceLaunchYears.toFixed(1)}y)`
+                      : `last ${yearsWord(years)}`}
+                    : <b>{fmtPct(pace.pct)}</b> per year
+                  </p>
+                )}
               </div>
-              {impliedCap !== null && (
-                <div className="r-line">
-                  <span>Implied market cap</span>
-                  <span>{fmtBig(impliedCap)}</span>
-                </div>
-              )}
-              {anchors && (
-                <div className="r-line">
-                  <span>Vs reality</span>
-                  <span>= {anchors.join(" · ")}</span>
-                </div>
-              )}
-              {pace && (
-                <div className="spread">
-                  <div className="s-row two">
-                    <span className="s-lbl">Required pace</span>
-                    <span className="s-worth">{fmtPace(multiple, years)}</span>
-                  </div>
-                  <div className="s-row two">
-                    <span className="s-lbl">
-                      {pace.sinceLaunchYears
-                        ? `Historical · since launch (${pace.sinceLaunchYears.toFixed(1)}y)`
-                        : `Historical pace (${years}y)`}
-                    </span>
-                    <span className="s-worth">{pace.text}</span>
-                  </div>
-                </div>
-              )}
             </>
           ) : (
             <div className="r-unavail">enter a target to run the arithmetic</div>
