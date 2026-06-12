@@ -11,12 +11,36 @@ import type { Coin } from "@/lib/types";
 const needsLightDisc = new Map<string, boolean>();
 
 const ALPHA_CUTOFF = 16; // ignore near-transparent pixels
-const DARK_LUMINANCE = 0.3; // below this average, the mark needs the disc
-const MIN_COVERAGE = 0.05; // an almost-empty mark reads as dark too
 
-/** Average luminance + alpha coverage of the rendered logo. */
+/* Thresholds fitted against the real top-ranked logos (measured in the
+   browser): keep BTC/DOGE/SOL/PEPE/BNB bare while USDT/TRX/ADA/LTC/XRP/ETH
+   get the disc. */
+const MIN_CONTRAST = 3; // WCAG ratio vs the panel below this → disc
+const FULL_BLEED_COVERAGE = 0.95; // tile-filling marks (squares)…
+const FULL_BLEED_CONTRAST = 3.4; // …need a bit more contrast (PEPE: 3.75)
+const SATURATED_CHROMA = 97; // flat saturated colors (max−min channel)…
+const SATURATED_CONTRAST = 7; // …read darker than their ratio (USDT: 6.5)
+
+function srgbToLinear(channel: number): number {
+  const v = channel / 255;
+  return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+}
+
+function relativeLuminance(r: number, g: number, b: number): number {
+  return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
+}
+
+/** Panel surface the logos sit on (~#14100a). */
+const PANEL_LUMINANCE = relativeLuminance(20, 16, 10);
+
+/**
+ * WCAG contrast of the logo's average opaque color against the panel.
+ * Too little contrast, a full-bleed dark tile, or a flat mid-dark
+ * saturated color (multi-hue gradients like SOL average toward gray and
+ * are exempt) → render on the light disc.
+ */
 function logoNeedsLightDisc(img: HTMLImageElement): boolean {
-  const S = 24;
+  const S = 32;
   const canvas = document.createElement("canvas");
   canvas.width = S;
   canvas.height = S;
@@ -24,15 +48,32 @@ function logoNeedsLightDisc(img: HTMLImageElement): boolean {
   if (!ctx) return false;
   ctx.drawImage(img, 0, 0, S, S);
   const data = ctx.getImageData(0, 0, S, S).data;
-  let lumSum = 0;
   let visible = 0;
+  let r = 0;
+  let g = 0;
+  let b = 0;
   for (let i = 0; i < data.length; i += 4) {
     if (data[i + 3] < ALPHA_CUTOFF) continue;
     visible += 1;
-    lumSum += (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) / 255;
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
   }
   if (visible === 0) return true;
-  return lumSum / visible < DARK_LUMINANCE || visible / (S * S) < MIN_COVERAGE;
+  r /= visible;
+  g /= visible;
+  b /= visible;
+
+  const lum = relativeLuminance(r, g, b);
+  const contrast =
+    (Math.max(lum, PANEL_LUMINANCE) + 0.05) / (Math.min(lum, PANEL_LUMINANCE) + 0.05);
+  const coverage = visible / (S * S);
+  const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+
+  if (contrast < MIN_CONTRAST) return true;
+  if (coverage >= FULL_BLEED_COVERAGE && contrast < FULL_BLEED_CONTRAST) return true;
+  if (chroma >= SATURATED_CHROMA && contrast < SATURATED_CONTRAST) return true;
+  return false;
 }
 
 /**
