@@ -13,6 +13,7 @@ const MONTH_LABELS = [
 const PRESETS = [
   { label: "BTC 2013", slug: "btc", year: 2013 },
   { label: "ETH 2016", slug: "eth", year: 2016 },
+  { label: "XRP 2018", slug: "xrp", year: 2018 },
   { label: "DOGE 2020", slug: "doge", year: 2020 },
   { label: "SOL 2020", slug: "sol", year: 2020 },
   { label: "SHIB 2021", slug: "shib", year: 2021 },
