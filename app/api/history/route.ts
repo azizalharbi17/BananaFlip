@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSupabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,69 @@ const historyCache = new Map<string, Promise<CoinHistory | null>>();
 
 const SYMBOL_RE = /^[A-Z0-9]{1,15}$/;
 
-async function fetchHistory(symbol: string): Promise<CoinHistory | null> {
+/** A stored payload older than this is refreshed — but only when the
+ *  upstream call succeeds; stale always beats none. */
+const REFRESH_AFTER_MS = 24 * 3600 * 1000;
+
+/**
+ * Persisted layer: the free CryptoCompare quota (~100 calls/month) can't
+ * survive the in-memory cache resetting on every deploy or restart, so
+ * computed payloads live in the Supabase coin_history table and the
+ * upstream is hit once per coin, plus a daily top-up for new closes.
+ */
+async function readStored(
+  symbol: string
+): Promise<{ history: CoinHistory; fresh: boolean } | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from("coin_history")
+      .select("payload,fetched_at")
+      .eq("symbol", symbol)
+      .maybeSingle();
+    if (error || !data?.payload) return null;
+    return {
+      history: data.payload as CoinHistory,
+      fresh: Date.now() - Date.parse(data.fetched_at) < REFRESH_AFTER_MS,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function writeStored(symbol: string, history: CoinHistory): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  try {
+    await supabase
+      .from("coin_history")
+      .upsert({ symbol, payload: history, fetched_at: new Date().toISOString() });
+  } catch {
+    /* persisting is best-effort — memory still has it */
+  }
+}
+
+/** Read-through: memory (caller) → Supabase → CryptoCompare. */
+async function resolveHistory(symbol: string): Promise<CoinHistory | null> {
+  const stored = await readStored(symbol);
+  if (stored?.fresh) return stored.history;
+  try {
+    const fetched = await fetchFromCryptoCompare(symbol);
+    if (fetched) {
+      void writeStored(symbol, fetched);
+      return fetched;
+    }
+    // Upstream says no-data; a previously stored payload still wins
+    // (delistings shouldn't erase working history).
+    return stored ? stored.history : null;
+  } catch (err) {
+    if (stored) return stored.history; // stale beats none
+    throw err; // transient with nothing stored — caller evicts and retries
+  }
+}
+
+async function fetchFromCryptoCompare(symbol: string): Promise<CoinHistory | null> {
   const key = process.env.CRYPTOCOMPARE_API_KEY;
   if (!key) return null;
 
@@ -173,7 +236,7 @@ async function fetchHistory(symbol: string): Promise<CoinHistory | null> {
 function getHistory(symbol: string): Promise<CoinHistory | null> {
   let cached = historyCache.get(symbol);
   if (!cached) {
-    cached = fetchHistory(symbol).catch((err) => {
+    cached = resolveHistory(symbol).catch((err) => {
       historyCache.delete(symbol); // don't cache transient failures
       throw err;
     });

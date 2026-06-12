@@ -99,9 +99,12 @@ The toggle hides for pairs where Coin B has no ATH data.
 
 Entry is the first daily close of a selected **month + year**, from
 CryptoCompare's full history (`/api/history?symbol=` returns one rich
-per-coin payload — monthly first closes, yearly high/low, and post-entry
-tops — cached in memory; month changes, the timing spread and the exit
-toggle cost no further upstream calls). Month/year options adapt to each
+per-coin payload — monthly first closes, yearly high/low, post-entry
+tops and the daily series). Payloads are persisted in the Supabase
+`coin_history` table (migration 0003) and cached in memory: the
+upstream is hit once per coin plus a daily top-up, surviving deploys —
+essential on the free key's ~100 calls/month. A stale stored payload
+keeps serving whenever the upstream refresh fails. Month/year options adapt to each
 coin's first available data. The result shows a WORST TIMING / YOUR
 ENTRY / BEST TIMING spread (bought the year's top / your month / the
 year's low), a STILL HOLDING vs SOLD THE TOP exit toggle (sell at the
