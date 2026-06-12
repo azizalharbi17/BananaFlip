@@ -110,6 +110,13 @@ nav {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Comfortable tap target on touch screens; the 72px bar centers it
+     so desktop looks identical. */
+  min-height: 44px;
+  padding-right: 6px;
+  position: relative;
+  z-index: 1;
+  touch-action: manipulation;
 }
 .brand .flip {
   background: var(--gold-grad);
@@ -948,9 +955,12 @@ footer {
 }
 
 @media (max-width: 780px) {
+  /* .hero's own padding overrides .wrap's 20px gutter on this shared
+     element; restore it here so text never touches the screen edge.
+     Desktop keeps the reference's flush-grid look. */
   .hero {
     grid-template-columns: 1fr;
-    padding-top: 38px;
+    padding: 38px 20px 8px;
   }
   .candle-banana {
     display: none;
