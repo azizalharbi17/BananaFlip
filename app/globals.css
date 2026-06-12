@@ -70,6 +70,21 @@ button {
   border-radius: 6px;
 }
 
+/* No spinner arrows on any numeric input, site-wide. */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input::placeholder {
+  color: var(--faint);
+  opacity: 1;
+}
+
 /* ---------- nav ---------- */
 nav {
   border-bottom: 1px solid var(--line-soft);
@@ -563,13 +578,6 @@ img.disc.on-light {
   padding: 10px 12px;
   font-family: var(--font-mono);
   font-size: 1.05rem;
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-.hold-in::-webkit-outer-spin-button,
-.hold-in::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 .hold-sym {
   font-family: var(--font-mono);
@@ -582,6 +590,9 @@ img.disc.on-light {
   gap: 4px;
 }
 .hold-val {
+  display: flex;
+  align-items: center;
+  min-height: 2rem;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 1.8rem;
@@ -591,6 +602,14 @@ img.disc.on-light {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+.hold-val.placeholder {
+  background: none;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 0.84rem;
+  letter-spacing: 0.04em;
 }
 .hold-now {
   font-family: var(--font-mono);

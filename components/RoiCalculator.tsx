@@ -28,7 +28,7 @@ interface RoiCalculatorProps {
 }
 
 export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps) {
-  const [amount, setAmount] = useState("100");
+  const [amount, setAmount] = useState("");
   const [coinSlug, setCoinSlug] = useState(
     coins.some((c) => c.slug === "sol") ? "sol" : coins[0]?.slug ?? ""
   );
@@ -41,9 +41,10 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
   async function run(e: React.FormEvent) {
     e.preventDefault();
     if (running) return;
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) return; // nothing typed yet
     setRunning(true);
     try {
-      const amt = Math.max(1, Number(amount) || 0);
       let coin = coins.find((c) => c.slug === coinSlug);
 
       if (isDemoData) {
@@ -101,7 +102,8 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
               id="roiAmt"
               type="number"
               min={1}
-              inputMode="numeric"
+              inputMode="decimal"
+              placeholder="Amount in USD"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />

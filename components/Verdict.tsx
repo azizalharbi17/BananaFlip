@@ -154,7 +154,7 @@ export default function Verdict({ a, b, coins, pulse }: VerdictProps) {
               min={0}
               step="any"
               inputMode="decimal"
-              placeholder="1000"
+              placeholder="Amount of coins"
               value={holdAmount}
               onChange={(e) => setHoldAmount(e.target.value)}
             />
@@ -163,8 +163,8 @@ export default function Verdict({ a, b, coins, pulse }: VerdictProps) {
         </div>
         <div className="hold-result">
           <div className="lbl">Estimated value</div>
-          <div className="hold-val">
-            {hasHoldings ? fmtUsd(holdings * impliedPrice) : "—"}
+          <div className={`hold-val${hasHoldings ? "" : " placeholder"}`}>
+            {hasHoldings ? fmtUsd(holdings * impliedPrice) : "Enter amount of coins"}
           </div>
           <div className="hold-now">
             {hasHoldings
