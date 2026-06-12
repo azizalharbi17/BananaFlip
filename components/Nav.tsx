@@ -1,26 +1,12 @@
-"use client";
-
-import Link from "next/link";
-
 export default function Nav({ isDemoData }: { isDemoData: boolean }) {
   return (
     <nav>
       <div className="wrap nav-in">
-        <Link
-          className="brand"
-          href="/"
-          aria-label="BananaFlip home"
-          onClick={(e) => {
-            // Already home → just glide back to the top.
-            if (window.location.pathname === "/") {
-              e.preventDefault();
-              const reduced = window.matchMedia(
-                "(prefers-reduced-motion: reduce)"
-              ).matches;
-              window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
-            }
-          }}
-        >
+        {/* Deliberately a plain anchor, not next/link: a classic logo
+            click is a full navigation — including a real refresh with
+            fresh data when already on the home page. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a className="brand" href="/" aria-label="BananaFlip home">
           {/* Mirrored so the banana rises left-to-right like the charts. */}
           <span className="brand-mark" aria-hidden="true">
             🍌
@@ -28,7 +14,7 @@ export default function Nav({ isDemoData }: { isDemoData: boolean }) {
           <span>
             Banana<span className="flip">Flip</span>
           </span>
-        </Link>
+        </a>
         <div className="nav-links">
           <a href="#machine">Flip</a>
           <a href="#hot">Hot flips</a>
