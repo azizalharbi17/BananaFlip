@@ -83,12 +83,12 @@ nav {
   display: flex;
   align-items: center;
   gap: 26px;
-  height: 60px;
+  height: 72px;
 }
 .brand {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   letter-spacing: -0.01em;
   text-decoration: none;
   color: #fff;
@@ -102,13 +102,16 @@ nav {
   background-clip: text;
   color: transparent;
 }
-.brand svg {
-  display: block;
+.brand-mark {
+  display: inline-block;
+  font-size: 1.6rem;
+  line-height: 1;
+  transform: scaleX(-1); /* point the banana up-and-to-the-right */
 }
 .nav-links {
   display: flex;
   gap: 20px;
-  font-size: 0.86rem;
+  font-size: 1rem;
   color: var(--muted);
 }
 .nav-links a {
