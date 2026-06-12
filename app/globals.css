@@ -235,9 +235,20 @@ nav {
   font-size: 0.78rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
+/* Logos sit on a warm off-white disc (matches --text) so dark or
+   transparent marks (XRP, ETH…) stay legible on the dark panels; the
+   padding keeps the mark off the edge. Monogram fallbacks keep their
+   colored style. */
 img.disc {
-  object-fit: cover;
-  background: var(--panel-2);
+  object-fit: contain;
+  background: var(--text);
+  padding: 6px; /* ~15% of the 42px disc */
+}
+.menu img.disc {
+  padding: 4px;
+}
+.pair img.disc {
+  padding: 4px;
 }
 .pick-name {
   display: flex;
