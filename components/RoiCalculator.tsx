@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fmtPrice, fmtX } from "@/lib/format";
 import type { RankedCoin } from "@/lib/types";
 
-const YEARS = ["2021", "2022", "2023", "2024", "2025", "2026"];
+/** Static demo-mode years (the seeded math works for any year). */
+const DEMO_YEARS = ["2021", "2022", "2023", "2024", "2025", "2026"];
 
 /**
  * Demo-mode multiplier from the reference — hashes coin + year into a
  * stable "price then" fraction. Only used when the whole site runs on
- * the demo seed; live mode fetches real Jan 1 prices via /api/history.
+ * the demo seed; live mode fetches real yearly closes via /api/history.
  */
 function seeded(slug: string, year: string): number {
   let h = 0;
@@ -28,15 +29,53 @@ interface RoiCalculatorProps {
 }
 
 export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps) {
+  const currentYear = String(new Date().getFullYear());
   const [amount, setAmount] = useState("");
   const [coinSlug, setCoinSlug] = useState(
     coins.some((c) => c.slug === "sol") ? "sol" : coins[0]?.slug ?? ""
   );
-  // Coinpaprika's free plan only reaches ~1 year back, so default to the
-  // newest year in live mode; the demo keeps the reference's 2023.
-  const [year, setYear] = useState(isDemoData ? "2023" : YEARS[YEARS.length - 1]);
+  const [years, setYears] = useState<string[]>(isDemoData ? DEMO_YEARS : [currentYear]);
+  const [year, setYear] = useState(isDemoData ? "2023" : currentYear);
+  const [yearsLoading, setYearsLoading] = useState(false);
   const [result, setResult] = useState<RoiResult | null>(null);
   const [running, setRunning] = useState(false);
+
+  const coin = useMemo(
+    () => coins.find((c) => c.slug === coinSlug),
+    [coins, coinSlug]
+  );
+
+  // Live mode: each coin's year range comes from its first available
+  // data point (one cached /api/history call per coin) — BTC offers
+  // 2011+, SOL 2021+, PEPE 2023+.
+  useEffect(() => {
+    if (isDemoData || !coin) return;
+    const ctrl = new AbortController();
+    setYearsLoading(true); // hold "Run it" until the range matches the coin
+    fetch(`/api/history?symbol=${encodeURIComponent(coin.symbol)}`, {
+      signal: ctrl.signal,
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { available: boolean; firstYear?: number; lastYear?: number } | null) => {
+        if (!data?.available || !data.firstYear) {
+          setYears([currentYear]); // run() will surface "unavailable"
+          setYear(currentYear);
+          return;
+        }
+        const last = Math.max(data.lastYear ?? data.firstYear, Number(currentYear));
+        const range: string[] = [];
+        for (let y = data.firstYear; y <= last; y++) range.push(String(y));
+        setYears(range);
+        setYear((prev) => (range.includes(prev) ? prev : range[range.length - 1]));
+      })
+      .catch(() => {
+        /* aborted or offline — keep the current list */
+      })
+      .finally(() => {
+        if (!ctrl.signal.aborted) setYearsLoading(false);
+      });
+    return () => ctrl.abort();
+  }, [coin, isDemoData, currentYear]);
 
   async function run(e: React.FormEvent) {
     e.preventDefault();
@@ -45,42 +84,44 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
     if (!Number.isFinite(amt) || amt <= 0) return; // nothing typed yet
     setRunning(true);
     try {
-      let coin = coins.find((c) => c.slug === coinSlug);
+      let current = coin;
 
       if (isDemoData) {
         // Demo: deterministic synthetic history, as in the reference.
         try {
           const r = await fetch(`/api/coin/${coinSlug}`);
-          if (r.ok) coin = ((await r.json()) as { coin: RankedCoin }).coin;
+          if (r.ok) current = ((await r.json()) as { coin: RankedCoin }).coin;
         } catch {
           /* offline — use what we have */
         }
-        if (coin) {
-          const then = coin.price * seeded(coin.slug, year);
-          const out = amt * (coin.price / then);
-          setResult({ kind: "ok", then, now: coin.price, out, gain: out >= amt });
+        if (current) {
+          const then = current.price * seeded(current.slug, year);
+          const out = amt * (current.price / then);
+          setResult({ kind: "ok", then, now: current.price, out, gain: out >= amt });
         }
         return;
       }
 
-      // Live: real Jan 1 close from our history API (cached server-side).
+      // Live: real first-close-of-year from our history API.
       const [coinRes, histRes] = await Promise.all([
         fetch(`/api/coin/${coinSlug}`).catch(() => null),
-        fetch(`/api/history/${coinSlug}?year=${year}`).catch(() => null),
+        fetch(
+          `/api/history?symbol=${encodeURIComponent(current?.symbol ?? "")}&year=${year}`
+        ).catch(() => null),
       ]);
       if (coinRes?.ok) {
-        coin = ((await coinRes.json()) as { coin: RankedCoin }).coin;
+        current = ((await coinRes.json()) as { coin: RankedCoin }).coin;
       }
       const hist = histRes?.ok
         ? ((await histRes.json()) as { available: boolean; price?: number })
         : null;
 
-      if (!coin || !hist?.available || !hist.price) {
+      if (!current || !hist?.available || !hist.price) {
         setResult({ kind: "unavailable" });
         return;
       }
-      const out = amt * (coin.price / hist.price);
-      setResult({ kind: "ok", then: hist.price, now: coin.price, out, gain: out >= amt });
+      const out = amt * (current.price / hist.price);
+      setResult({ kind: "ok", then: hist.price, now: current.price, out, gain: out >= amt });
     } finally {
       setRunning(false);
     }
@@ -92,7 +133,7 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
     <>
       <div className="section-h" id="roi">
         <h2>ROI time machine</h2>
-        <span>{isDemoData ? "demo figures" : "jan 1 price anchors"}</span>
+        <span>{isDemoData ? "demo figures" : "first close of each year"}</span>
       </div>
       <div className="roi">
         <form className="card" onSubmit={run}>
@@ -125,13 +166,13 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
           <div className="f-row">
             <label htmlFor="roiYear">Back in</label>
             <select id="roiYear" value={year} onChange={(e) => setYear(e.target.value)}>
-              {YEARS.map((y) => (
+              {years.map((y) => (
                 <option key={y}>{y}</option>
               ))}
             </select>
           </div>
-          <button className="go" type="submit" disabled={running}>
-            Run it
+          <button className="go" type="submit" disabled={running || yearsLoading}>
+            {running ? "Running…" : "Run it"}
           </button>
         </form>
         <div className="card r-out">
@@ -161,7 +202,7 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
           <div className="r-note">
             {isDemoData
               ? "DEMO FIGURES · PROTOTYPE ONLY · NOT FINANCIAL ADVICE"
-              : "PRICE THEN = JAN 1 CLOSE · DATA BY COINPAPRIKA · NOT FINANCIAL ADVICE"}
+              : "PRICE THEN = FIRST CLOSE OF THAT YEAR · CRYPTOCOMPARE · NOT FINANCIAL ADVICE"}
           </div>
         </div>
       </div>

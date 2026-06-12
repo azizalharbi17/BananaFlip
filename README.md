@@ -75,6 +75,7 @@ a stable mid-tone color hashed from its symbol ([lib/colors.ts](lib/colors.ts)).
 | `SUPABASE_URL` | Supabase project URL (server-side only) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key (server-side only) |
 | `CRON_SECRET` | Bearer token guarding `/api/refresh` |
+| `CRYPTOCOMPARE_API_KEY` | Free CoinDesk-data key for ROI price history |
 | `NEXT_PUBLIC_SITE_URL` | Optional canonical origin for metadata/sitemap |
 
 ## Internal API
@@ -84,7 +85,7 @@ a stable mid-tone color hashed from its symbol ([lib/colors.ts](lib/colors.ts)).
 | `GET /api/search?q=do` | Coins matching name/symbol, best rank first (limit 20) |
 | `GET /api/coin/:slug` | One coin with its market-cap rank |
 | `GET /api/compare?challenger=pepe&target=doge` | Implied price, multiplier, cap gap, already-flipped flag |
-| `GET /api/history/:slug?year=2026` | The coin's Jan 1 close for that year, or `{available:false}` |
+| `GET /api/history?symbol=BTC[&year=2017]` | Year range (first→last) or that year's first close, or `{available:false}` |
 | `GET/POST /api/refresh` | Cron-only data refresh (bearer auth) |
 
 ### NOW / ATH toggle
@@ -96,10 +97,15 @@ The toggle hides for pairs where Coin B has no ATH data.
 
 ### ROI time machine
 
-"Price then" is the real Jan 1 close from coinpaprika's historical
-endpoint, fetched server-side via `/api/history` and cached for 30 days.
-The free plan only serves the trailing 365 days, so out-of-window years
-show *historical data unavailable for this range*. Demo mode keeps the
+"Price then" is the first daily close of the selected year (Jan 1 for
+established coins, the inception close for a coin's launch year) from
+CryptoCompare's full history, fetched server-side via `/api/history`
+and cached in memory — one upstream call per coin covers every year.
+The year dropdown adapts to each coin's launch (BTC 2011+, SOL 2021+,
+PEPE 2023+). Requires `CRYPTOCOMPARE_API_KEY` (free at
+developers.coindesk.com — the keyless tier was retired); without it, or
+for coins CryptoCompare doesn't track, the calculator shows
+*historical data unavailable for this range*. Demo mode keeps the
 reference's deterministic synthetic figures, labeled as such.
 
 ### Coin logos
