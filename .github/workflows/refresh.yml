@@ -11,7 +11,11 @@ jobs:
     steps:
       - name: Call /api/refresh
         run: |
-          curl -fsS -X POST "https://bananaflip.io/api/refresh" \
+          # Canonical www host on purpose: the apex bananaflip.io 308-
+          # redirects to www, and curl neither follows it here nor would
+          # resend the bearer across the cross-host hop — so a POST to the
+          # apex was silently dropped, leaving prices stale for days.
+          curl -fsS -X POST "https://www.bananaflip.io/api/refresh" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             --max-time 120
         env:
