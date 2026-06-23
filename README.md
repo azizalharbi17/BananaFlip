@@ -97,14 +97,18 @@ The toggle hides for pairs where Coin B has no ATH data.
 
 ### ROI time machine
 
-Entry is the first daily close of a selected **month + year**, from
-CryptoCompare's full history (`/api/history?symbol=` returns one rich
-per-coin payload — monthly first closes, yearly high/low, post-entry
-tops and the daily series). Payloads are persisted in the Supabase
-`coin_history` table (migration 0003) and cached in memory: the
-upstream is hit once per coin plus a daily top-up, surviving deploys —
-essential on the free key's ~100 calls/month. A stale stored payload
-keeps serving whenever the upstream refresh fails. Month/year options adapt to each
+Entry is the first daily close of a selected **month + year**.
+`/api/history?symbol=` returns one rich per-coin payload — monthly
+first closes, yearly high/low, post-entry tops and the daily series.
+Daily closes come from **Binance public klines** (the
+`data-api.binance.vision` mirror — free, no key, no monthly cap, not
+geo-blocked, full history back to each USDT pair's listing), falling
+back to **CryptoCompare** only for coins Binance doesn't list (its free
+key is ~100 calls/*month*, so it must stay off the common path).
+Payloads are persisted in the Supabase `coin_history` table (migration
+0003) and cached in memory, so the upstream is touched ~once per coin
+plus a weekly top-up and survives deploys. A stale stored payload keeps
+serving whenever an upstream refresh fails. Month/year options adapt to each
 coin's first available data. The result shows a WORST TIMING / YOUR
 ENTRY / BEST TIMING spread (bought the year's top / your month / the
 year's low), a STILL HOLDING vs SOLD THE TOP exit toggle (sell at the

@@ -4,17 +4,20 @@ import { getSupabase } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 
 /**
- * ROI history backed by CryptoCompare daily data (histoday, symbol vs
- * USD, allData=true → full history back to coin inception).
+ * ROI/DCA daily price history.
  *
- * Free-tier status, checked live (June 2026): every min-api endpoint now
- * returns 401 "API key required" without a key — the keyless tier was
- * retired when CryptoCompare merged into the CoinDesk developer platform
- * (developers.coindesk.com). Free keys exist after registration; the
- * documented free allowance is generous (~100k calls/month) and one call
- * here serves a coin's ENTIRE history, which we then cache in memory.
- * The key is read from CRYPTOCOMPARE_API_KEY; without one this route
- * degrades to {available:false} and the UI shows its unavailable state.
+ * Primary source is Binance public klines (free, no key, no monthly cap,
+ * full daily history back to each USDT pair's listing). Fallback is
+ * CryptoCompare histoday for coins Binance doesn't list — its free key
+ * (CRYPTOCOMPARE_API_KEY) is only ~100 calls/MONTH, so it must stay off
+ * the common path. We learned this the hard way: the route used to fetch
+ * CC-only, the monthly quota blew (421/100), and the Supabase cache
+ * couldn't bootstrap because it shipped after the quota was already
+ * dead — ROI/DCA returned {available:false,reason:"upstream"} for days.
+ *
+ * Every payload is persisted in Supabase (see resolveHistory) so the
+ * upstream is touched roughly once per coin; without Supabase or any
+ * upstream the route degrades to {available:false}.
  *
  * GET /api/history?symbol=BTC → the coin's full ROI detail in one shot:
  *   per year: highest/lowest daily close (+ the best later sell for
@@ -64,8 +67,9 @@ const historyCache = new Map<string, Promise<CoinHistory | null>>();
 const SYMBOL_RE = /^[A-Z0-9]{1,15}$/;
 
 /** A stored payload older than this is refreshed — but only when the
- *  upstream call succeeds; stale always beats none. */
-const REFRESH_AFTER_MS = 24 * 3600 * 1000;
+ *  upstream call succeeds; stale always beats none. Daily closes barely
+ *  change, so a weekly top-up keeps the metered CC fallback in budget. */
+const REFRESH_AFTER_MS = 7 * 24 * 3600 * 1000;
 
 /**
  * Persisted layer: the free CryptoCompare quota (~100 calls/month) can't
@@ -106,12 +110,12 @@ async function writeStored(symbol: string, history: CoinHistory): Promise<void> 
   }
 }
 
-/** Read-through: memory (caller) → Supabase → CryptoCompare. */
+/** Read-through: memory (caller) → Supabase → upstream (Binance/CC). */
 async function resolveHistory(symbol: string): Promise<CoinHistory | null> {
   const stored = await readStored(symbol);
   if (stored?.fresh) return stored.history;
   try {
-    const fetched = await fetchFromCryptoCompare(symbol);
+    const fetched = await fetchUpstream(symbol);
     if (fetched) {
       void writeStored(symbol, fetched);
       return fetched;
@@ -125,7 +129,55 @@ async function resolveHistory(symbol: string): Promise<CoinHistory | null> {
   }
 }
 
-async function fetchFromCryptoCompare(symbol: string): Promise<CoinHistory | null> {
+interface RawPoint {
+  time: number; // unix seconds
+  close: number;
+}
+
+/**
+ * Primary source: Binance public klines — free, no key, no monthly cap,
+ * full daily history back to each pair's USDT listing. Paginated at
+ * 1000 rows/page. Returns null when the pair isn't listed (a definitive
+ * "not here", error -1121); throws on transient network/5xx so the
+ * caller can fall back or retry.
+ *
+ * Uses the data-api.binance.vision mirror, not api.binance.com: same
+ * public market data, but it isn't geo-blocked, so it works from US
+ * Vercel regions where api.binance.com returns HTTP 451.
+ */
+async function binancePoints(symbol: string): Promise<RawPoint[] | null> {
+  const pair = `${symbol}USDT`;
+  const points: RawPoint[] = [];
+  let startTime = 0;
+  for (let page = 0; page < 25; page++) {
+    const url = `https://data-api.binance.vision/api/v3/klines?symbol=${encodeURIComponent(
+      pair
+    )}&interval=1d&startTime=${startTime}&limit=1000`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      const text = await res.text();
+      if (text.includes("-1121")) return points.length ? points : null; // not listed
+      throw new Error(`binance responded ${res.status}`);
+    }
+    const rows = (await res.json()) as [number, string, string, string, string][];
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    for (const r of rows) {
+      const close = Number(r[4]);
+      if (close > 0) points.push({ time: Math.floor(r[0] / 1000), close });
+    }
+    if (rows.length < 1000) break;
+    startTime = rows[rows.length - 1][0] + 86_400_000; // day after last open
+  }
+  return points.length ? points : null;
+}
+
+/**
+ * Fallback source: CryptoCompare full history (reaches deeper than a
+ * coin's Binance listing, and covers coins Binance doesn't pair). The
+ * free key is capped at ~100 calls/month, so this is only reached when
+ * Binance has nothing — keeping the common path off the metered key.
+ */
+async function cryptoComparePoints(symbol: string): Promise<RawPoint[] | null> {
   const key = process.env.CRYPTOCOMPARE_API_KEY;
   if (!key) return null;
 
@@ -147,17 +199,39 @@ async function fetchFromCryptoCompare(symbol: string): Promise<CoinHistory | nul
   };
   const points = body?.Data?.Data;
   if (!Array.isArray(points) || points.length === 0) {
-    // Only an explicit "market does not exist" is a final answer worth
-    // caching; anything else (rate limits, hiccups) must throw so the
-    // cache evicts it and the next request retries — a transient error
-    // here once bricked BTC until restart.
+    // Only an explicit "market does not exist" is a final answer; rate
+    // limits and hiccups must throw so the caller doesn't cache them.
     const message = body?.Message ?? "";
     if (/does not exist|invalid/i.test(message)) return null;
     throw new Error(`cryptocompare empty response: ${message.slice(0, 80)}`);
   }
+  return points
+    .filter((p) => p.close > 0)
+    .map((p) => ({ time: p.time, close: p.close }));
+}
 
-  const valid = points.filter((p) => p.close > 0); // drop inception padding
-  if (valid.length === 0) return null;
+/**
+ * Try Binance first (free, full history, no cap), then CryptoCompare for
+ * coins Binance doesn't list. Binance transients fall through to CC; a
+ * CC transient with no Binance data propagates so resolveHistory can
+ * serve a stored payload instead.
+ */
+async function fetchUpstream(symbol: string): Promise<CoinHistory | null> {
+  let points: RawPoint[] | null = null;
+  try {
+    points = await binancePoints(symbol);
+  } catch {
+    /* Binance unreachable — fall through to CryptoCompare */
+  }
+  if (!points) {
+    points = await cryptoComparePoints(symbol);
+  }
+  return points ? buildHistory(points) : null;
+}
+
+/** Derive the rich ROI/DCA payload from a daily close series. */
+function buildHistory(rawPoints: RawPoint[]): CoinHistory | null {
+  if (rawPoints.length === 0) return null;
 
   // Asset-splice guard: symbol-keyed series sometimes graft a different
   // asset's past onto the current coin (CC's "PEPE" is PepeCoin until
@@ -165,12 +239,12 @@ async function fetchFromCryptoCompare(symbol: string): Promise<CoinHistory | nul
   // market moves 1000× in a day, so treat any such jump as a splice or
   // redenomination and only trust data after the last one.
   let start = 0;
-  for (let i = 1; i < valid.length; i++) {
-    if (Math.abs(Math.log10(valid[i].close / valid[i - 1].close)) >= 3) {
+  for (let i = 1; i < rawPoints.length; i++) {
+    if (Math.abs(Math.log10(rawPoints[i].close / rawPoints[i - 1].close)) >= 3) {
       start = i;
     }
   }
-  const series = valid.slice(start);
+  const series = rawPoints.slice(start);
 
   // One backward pass: for every day, the highest close from there to
   // today (sold-the-top exits) plus the indices of the forward-window
