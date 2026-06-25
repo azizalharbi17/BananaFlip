@@ -204,7 +204,7 @@ export default function RoiCalculator({ coins, isDemoData }: RoiCalculatorProps)
   return (
     <>
       <div className="section-h" id="roi">
-        <h2>ROI time machine</h2>
+        <h2>ROI Time Machine</h2>
         <span>{isDemoData ? "demo figures" : "month entry · daily closes"}</span>
       </div>
       <div className="chips" role="group" aria-label="Preset scenarios">

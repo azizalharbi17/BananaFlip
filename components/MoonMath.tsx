@@ -137,7 +137,7 @@ export default function MoonMath({ coins, isDemoData }: MoonMathProps) {
   return (
     <>
       <div className="section-h" id="moon">
-        <h2>Moon math</h2>
+        <h2>Moon Math</h2>
         <span>no predictions · just arithmetic</span>
       </div>
       <div className="roi">

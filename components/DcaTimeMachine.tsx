@@ -202,7 +202,7 @@ export default function DcaTimeMachine({ coins, isDemoData }: DcaTimeMachineProp
   return (
     <>
       <div className="section-h" id="dca">
-        <h2>DCA time machine</h2>
+        <h2>DCA Time Machine</h2>
         <span>what regular buys would&apos;ve done · real prices</span>
       </div>
       <div className="roi">

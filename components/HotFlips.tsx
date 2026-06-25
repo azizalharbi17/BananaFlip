@@ -19,7 +19,7 @@ export default function HotFlips({ rows, onLoadPair }: HotFlipsProps) {
   return (
     <>
       <div className="section-h" id="hot">
-        <h2>Hot flips</h2>
+        <h2>Hot Flips</h2>
         <span>tap a row to load it</span>
       </div>
       <div className="table">
