@@ -162,7 +162,12 @@ nav {
   grid-template-columns: 1.25fr 0.75fr;
   gap: 30px;
   align-items: center;
-  padding: 54px 0 8px;
+  /* Block padding only — the `padding` shorthand here used to zero out
+     .wrap's `0 20px` inline padding (.hero is header.hero.wrap and wins
+     on source order), so the hero hung ~20px left of the nav and cards.
+     Setting just top/bottom lets .wrap supply the shared 20px gutter. */
+  padding-top: 54px;
+  padding-bottom: 8px;
 }
 .hero h1 {
   font-family: var(--font-display);
