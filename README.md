@@ -76,6 +76,7 @@ a stable mid-tone color hashed from its symbol ([lib/colors.ts](lib/colors.ts)).
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key (server-side only) |
 | `CRON_SECRET` | Bearer token guarding `/api/refresh` |
 | `CRYPTOCOMPARE_API_KEY` | Free CoinDesk-data key for ROI price history |
+| `COINGECKO_API_KEY` | Optional CoinGecko demo key (headroom for pinned coins) |
 | `NEXT_PUBLIC_SITE_URL` | Optional canonical origin for metadata/sitemap |
 
 ## Internal API
@@ -87,6 +88,19 @@ a stable mid-tone color hashed from its symbol ([lib/colors.ts](lib/colors.ts)).
 | `GET /api/compare?challenger=pepe&target=doge` | Implied price, multiplier, cap gap, already-flipped flag |
 | `GET /api/history?symbol=BTC[&year=2017]` | Year range (first→last) or that year's first close, or `{available:false}` |
 | `GET/POST /api/refresh` | Cron-only data refresh (bearer auth) |
+
+### Pinned CoinGecko coins
+
+Most coins flow through coinpaprika (current values) and Binance (history).
+Coins that aren't on Binance — e.g. the Solana Pump.fun token **$ANSEM**
+("The Black Bull") — are pinned in [lib/pinned-coins.ts](lib/pinned-coins.ts)
+by CoinGecko id + contract (never by ticker; copycats abound) with
+`source = "coingecko"`. Their current values (circulating market cap —
+**not** FDV — plus supply and ATH) are pulled from CoinGecko in the
+refresh route and stored in the `coins` table; their history comes from
+CoinGecko `market_chart` (capped to the listing date) through the same
+`coin_history` read-through cache. Migration 0004 adds the `source` /
+`coingecko_id` columns.
 
 ### NOW / ATH toggle
 

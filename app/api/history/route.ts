@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchCgDailyCloses } from "@/lib/coingecko";
+import { PINNED_BY_SYMBOL } from "@/lib/pinned-coins";
 import { getSupabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -217,6 +219,14 @@ async function cryptoComparePoints(symbol: string): Promise<RawPoint[] | null> {
  * serve a stored payload instead.
  */
 async function fetchUpstream(symbol: string): Promise<CoinHistory | null> {
+  // Pinned CoinGecko coins (e.g. $ANSEM) aren't on Binance — their daily
+  // closes come from CoinGecko market_chart, capped to the listing date.
+  const pinned = PINNED_BY_SYMBOL[symbol.toUpperCase()];
+  if (pinned) {
+    const cgPoints = await fetchCgDailyCloses(pinned.coingeckoId);
+    return cgPoints ? buildHistory(cgPoints) : null;
+  }
+
   let points: RawPoint[] | null = null;
   try {
     points = await binancePoints(symbol);

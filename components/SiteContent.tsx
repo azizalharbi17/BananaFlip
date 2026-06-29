@@ -5,6 +5,7 @@ import MoonMath from "./MoonMath";
 import RoiCalculator from "./RoiCalculator";
 import { getCoins } from "@/lib/coins";
 import { HOT_PAIRS } from "@/lib/pairs";
+import { PINNED_SLUGS } from "@/lib/pinned-coins";
 import type { RankedCoin } from "@/lib/types";
 
 /** How many coins the client receives for pickers/ROI/distance scale. */
@@ -21,7 +22,14 @@ export default async function SiteContent({ challenger, target }: SiteContentPro
 
   // The client gets the top slice, not all ~2000 coins — search covers the
   // rest. Hot-flip rows are resolved here so they never depend on the slice.
-  const topCoins = coins.slice(0, CLIENT_COIN_COUNT);
+  // Pinned coins (e.g. $ANSEM) are appended if their rank falls outside the
+  // slice, so they're always selectable in the picker.
+  const top = coins.slice(0, CLIENT_COIN_COUNT);
+  const inTop = new Set(top.map((c) => c.slug));
+  const pinnedExtra = coins.filter(
+    (c) => PINNED_SLUGS.has(c.slug) && !inTop.has(c.slug)
+  );
+  const topCoins = [...top, ...pinnedExtra];
   const bySlug = new Map(coins.map((c) => [c.slug, c]));
   const hotRows = HOT_PAIRS.flatMap(({ challengerSlug, targetSlug }) => {
     const c = bySlug.get(challengerSlug);

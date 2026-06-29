@@ -1,6 +1,8 @@
 import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
+import { fetchCgMarket } from "@/lib/coingecko";
 import { colorForCoin } from "@/lib/colors";
+import { PINNED_COINS } from "@/lib/pinned-coins";
 import { assignSlug } from "@/lib/slugs";
 import { getSupabase } from "@/lib/supabase";
 
@@ -132,9 +134,51 @@ async function refresh(request: Request): Promise<NextResponse> {
     }
   }
 
+  // Pinned CoinGecko coins (e.g. $ANSEM) — circulating market cap, NOT FDV,
+  // since the rest of the app values coins by circulating cap. Rank is
+  // placed by market cap among the coinpaprika set. A CoinGecko hiccup
+  // skips the coin this cycle, leaving its existing row untouched.
+  let pinned = 0;
+  for (const p of PINNED_COINS) {
+    try {
+      const m = await fetchCgMarket(p.coingeckoId);
+      if (!m || !(m.price > 0) || !(m.marketCap > 0)) continue;
+      const rank =
+        eligible.filter((t) => (t.quotes?.USD?.market_cap ?? 0) > m.marketCap)
+          .length + 1;
+      const { error } = await supabase.from("coins").upsert(
+        {
+          id: p.id,
+          slug: p.slug,
+          symbol: p.symbol,
+          name: p.name,
+          rank,
+          price: m.price,
+          market_cap: m.marketCap,
+          circulating_supply:
+            m.circulatingSupply ?? (m.price > 0 ? m.marketCap / m.price : null),
+          ath_price: m.ath ?? null,
+          color: p.color,
+          source: "coingecko",
+          coingecko_id: p.coingeckoId,
+          updated_at: now,
+        },
+        { onConflict: "id" }
+      );
+      if (!error) pinned += 1;
+    } catch {
+      /* leave the existing pinned row in place */
+    }
+  }
+
   revalidateTag("coins"); // serve fresh numbers immediately
 
-  return NextResponse.json({ updated: rows.length, skipped, ms: Date.now() - t0 });
+  return NextResponse.json({
+    updated: rows.length,
+    pinned,
+    skipped,
+    ms: Date.now() - t0,
+  });
 }
 
 export { refresh as GET, refresh as POST };

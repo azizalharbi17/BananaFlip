@@ -15,6 +15,10 @@ export interface Coin {
   athPrice?: number | null;
   /** Brand color used for the coin disc. */
   color: string;
+  /** Where this coin's data comes from. Defaults to "binance". */
+  source?: "binance" | "coingecko";
+  /** CoinGecko id for source="coingecko" coins (e.g. "the-black-bull"). */
+  coingeckoId?: string | null;
 }
 
 /** A coin plus its market-cap rank (1 = largest). */

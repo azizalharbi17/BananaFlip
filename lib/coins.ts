@@ -15,7 +15,7 @@ import type { CoinDataset, RankedCoin } from "./types";
  */
 
 const DB_COLUMNS =
-  "id,slug,symbol,name,rank,price,market_cap,circulating_supply,ath_price,color";
+  "id,slug,symbol,name,rank,price,market_cap,circulating_supply,ath_price,color,source,coingecko_id";
 /** PostgREST caps responses at 1000 rows, so reads are paged. */
 const DB_PAGE = 1000;
 const MAX_COINS = 2000;
@@ -31,6 +31,8 @@ interface CoinRow {
   circulating_supply: number | string | null;
   ath_price: number | string | null;
   color: string;
+  source: string | null;
+  coingecko_id: string | null;
 }
 
 function rowToCoin(row: CoinRow): RankedCoin {
@@ -46,7 +48,21 @@ function rowToCoin(row: CoinRow): RankedCoin {
       row.circulating_supply == null ? null : Number(row.circulating_supply),
     athPrice: row.ath_price == null ? null : Number(row.ath_price),
     color: row.color,
+    source: row.source === "coingecko" ? "coingecko" : "binance",
+    coingeckoId: row.coingecko_id ?? null,
   };
+}
+
+interface SeedCoin {
+  id: string;
+  name: string;
+  symbol: string;
+  price: number;
+  marketCap: number;
+  athPrice?: number;
+  color: string;
+  source?: string;
+  coingeckoId?: string;
 }
 
 /**
@@ -54,13 +70,22 @@ function rowToCoin(row: CoinRow): RankedCoin {
  * Circulating supply is implied by marketCap/price, keeping the demo
  * ATH math consistent with the live formula.
  */
-const DEMO_COINS: RankedCoin[] = [...seed.coins]
+const DEMO_COINS: RankedCoin[] = (seed.coins as SeedCoin[])
+  .slice()
   .sort((a, b) => b.marketCap - a.marketCap)
   .map((c, i) => ({
-    ...c,
+    id: c.id,
     slug: c.id,
-    rank: i + 1,
+    symbol: c.symbol,
+    name: c.name,
+    price: c.price,
+    marketCap: c.marketCap,
+    athPrice: c.athPrice ?? null,
     circulatingSupply: c.marketCap / c.price,
+    color: c.color,
+    rank: i + 1,
+    source: c.source === "coingecko" ? "coingecko" : "binance",
+    coingeckoId: c.coingeckoId ?? null,
   }));
 
 const demoDataset = (): CoinDataset => ({ coins: DEMO_COINS, isDemoData: true });

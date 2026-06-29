@@ -25,6 +25,7 @@
     { "id": "pol", "name": "Polygon", "symbol": "POL", "price": 0.31, "marketCap": 3.2e9, "athPrice": 2.92, "color": "#8247E5" },
     { "id": "wif", "name": "dogwifhat", "symbol": "WIF", "price": 1.21, "marketCap": 1.21e9, "athPrice": 4.85, "color": "#A0826D" },
     { "id": "bonk", "name": "Bonk", "symbol": "BONK", "price": 0.0000125, "marketCap": 9.7e8, "athPrice": 0.000059, "color": "#F5A623" },
-    { "id": "floki", "name": "FLOKI", "symbol": "FLOKI", "price": 0.000071, "marketCap": 6.9e8, "athPrice": 0.00034, "color": "#F0B90B" }
+    { "id": "floki", "name": "FLOKI", "symbol": "FLOKI", "price": 0.000071, "marketCap": 6.9e8, "athPrice": 0.00034, "color": "#F0B90B" },
+    { "id": "ansem", "name": "ANSEM (The Black Bull)", "symbol": "ANSEM", "price": 0.0949, "marketCap": 3.824e7, "athPrice": 0.121152, "color": "#c0392b", "source": "coingecko", "coingeckoId": "the-black-bull" }
   ]
 }
