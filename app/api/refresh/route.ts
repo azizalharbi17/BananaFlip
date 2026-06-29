@@ -159,6 +159,7 @@ async function refresh(request: Request): Promise<NextResponse> {
             m.circulatingSupply ?? (m.price > 0 ? m.marketCap / m.price : null),
           ath_price: m.ath ?? null,
           color: p.color,
+          logo: m.image ?? null,
           source: "coingecko",
           coingecko_id: p.coingeckoId,
           updated_at: now,

@@ -13,8 +13,11 @@ export interface Coin {
   circulatingSupply?: number | null;
   /** All-time-high price in USD; null when the provider has none. */
   athPrice?: number | null;
-  /** Brand color used for the coin disc. */
+  /** Brand color used for the coin disc (monogram fallback). */
   color: string;
+  /** Logo image URL when not derivable from the id (e.g. CoinGecko coins).
+   *  Null for coinpaprika coins, which derive the logo from their id. */
+  logo?: string | null;
   /** Where this coin's data comes from. Defaults to "binance". */
   source?: "binance" | "coingecko";
   /** CoinGecko id for source="coingecko" coins (e.g. "the-black-bull"). */

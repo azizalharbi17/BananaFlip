@@ -15,7 +15,7 @@ import type { CoinDataset, RankedCoin } from "./types";
  */
 
 const DB_COLUMNS =
-  "id,slug,symbol,name,rank,price,market_cap,circulating_supply,ath_price,color,source,coingecko_id";
+  "id,slug,symbol,name,rank,price,market_cap,circulating_supply,ath_price,color,logo,source,coingecko_id";
 /** PostgREST caps responses at 1000 rows, so reads are paged. */
 const DB_PAGE = 1000;
 const MAX_COINS = 2000;
@@ -31,6 +31,7 @@ interface CoinRow {
   circulating_supply: number | string | null;
   ath_price: number | string | null;
   color: string;
+  logo: string | null;
   source: string | null;
   coingecko_id: string | null;
 }
@@ -48,6 +49,7 @@ function rowToCoin(row: CoinRow): RankedCoin {
       row.circulating_supply == null ? null : Number(row.circulating_supply),
     athPrice: row.ath_price == null ? null : Number(row.ath_price),
     color: row.color,
+    logo: row.logo ?? null,
     source: row.source === "coingecko" ? "coingecko" : "binance",
     coingeckoId: row.coingecko_id ?? null,
   };
@@ -61,6 +63,7 @@ interface SeedCoin {
   marketCap: number;
   athPrice?: number;
   color: string;
+  logo?: string;
   source?: string;
   coingeckoId?: string;
 }
@@ -83,6 +86,7 @@ const DEMO_COINS: RankedCoin[] = (seed.coins as SeedCoin[])
     athPrice: c.athPrice ?? null,
     circulatingSupply: c.marketCap / c.price,
     color: c.color,
+    logo: c.logo ?? null,
     rank: i + 1,
     source: c.source === "coingecko" ? "coingecko" : "binance",
     coingeckoId: c.coingeckoId ?? null,

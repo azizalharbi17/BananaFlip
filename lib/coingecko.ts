@@ -22,6 +22,8 @@ export interface CgMarket {
   fdv: number | null;
   circulatingSupply: number | null;
   ath: number | null;
+  /** Logo image URL (CoinGecko's "large" variant). */
+  image: string | null;
 }
 
 /** Current market snapshot for a coin id, or null if the id is unknown. */
@@ -36,6 +38,7 @@ export async function fetchCgMarket(id: string): Promise<CgMarket | null> {
         fully_diluted_valuation: number | null;
         circulating_supply: number | null;
         ath: number | null;
+        image: string | null;
       }[]
     | { status?: unknown };
   if (!Array.isArray(arr) || arr.length === 0) return null;
@@ -46,6 +49,7 @@ export async function fetchCgMarket(id: string): Promise<CgMarket | null> {
     fdv: r.fully_diluted_valuation ?? null,
     circulatingSupply: r.circulating_supply ?? null,
     ath: r.ath ?? null,
+    image: r.image ?? null,
   };
 }
 

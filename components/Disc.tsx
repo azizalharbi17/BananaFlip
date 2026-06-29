@@ -87,7 +87,13 @@ function logoNeedsLightDisc(img: HTMLImageElement): boolean {
  * globals.css (.menu .disc, .pair .disc), exactly like the reference.
  */
 export default function Disc({ coin }: { coin: Coin }) {
-  const hasLogo = coin.id.includes("-");
+  // Prefer a stored logo URL (e.g. CoinGecko-sourced coins like $ANSEM);
+  // otherwise derive it from the coinpaprika id convention via our proxy;
+  // otherwise fall back to the colored monogram.
+  const externalLogo =
+    coin.logo && coin.logo.startsWith("https://") ? coin.logo : null;
+  const logoSrc =
+    externalLogo ?? (coin.id.includes("-") ? `/api/logo/${coin.id}` : null);
   const [failed, setFailed] = useState(false);
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -112,16 +118,20 @@ export default function Disc({ coin }: { coin: Coin }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coin.id, failed]);
 
-  if (hasLogo && !failed) {
+  if (logoSrc && !failed) {
     const onLight = needsLightDisc.get(coin.id) === true;
     return (
-      // Tiny same-origin favicons with a JS error fallback — next/image's
-      // optimizer adds nothing here.
+      // Tiny favicons with a JS error fallback — next/image's optimizer
+      // adds nothing here.
       // eslint-disable-next-line @next/next/no-img-element
       <img
         ref={imgRef}
         className={`disc${onLight ? " on-light" : ""}`}
-        src={`/api/logo/${coin.id}`}
+        src={logoSrc}
+        // External CDN logos load in CORS mode (CoinGecko sends ACAO:*) so
+        // the canvas legibility check stays untainted; the same-origin
+        // proxy needs no crossOrigin.
+        crossOrigin={externalLogo ? "anonymous" : undefined}
         alt=""
         width={42}
         height={42}
