@@ -143,9 +143,15 @@ async function refresh(request: Request): Promise<NextResponse> {
     try {
       const m = await fetchCgMarket(p.coingeckoId);
       if (!m || !(m.price > 0) || !(m.marketCap > 0)) continue;
+      // Pump.fun tokens are quoted by FULL-supply cap everywhere the
+      // market looks (DexScreener shows marketCap = FDV, identical);
+      // CoinGecko's "market_cap" is circulating and reads ~2.5× low for
+      // ANSEM. Use FDV so the displayed cap — and every flippening
+      // computed from it — matches the quoted number. Binance-source
+      // coins above stay on circulating cap, untouched.
+      const cap = m.fdv && m.fdv > 0 ? m.fdv : m.marketCap;
       const rank =
-        eligible.filter((t) => (t.quotes?.USD?.market_cap ?? 0) > m.marketCap)
-          .length + 1;
+        eligible.filter((t) => (t.quotes?.USD?.market_cap ?? 0) > cap).length + 1;
       const { error } = await supabase.from("coins").upsert(
         {
           id: p.id,
@@ -154,9 +160,12 @@ async function refresh(request: Request): Promise<NextResponse> {
           name: p.name,
           rank,
           price: m.price,
-          market_cap: m.marketCap,
+          market_cap: cap,
+          // Effective supply backing the displayed cap (≈ total supply
+          // when cap is FDV) — keeps the ATH-cap toggle and Moon math on
+          // the same full-supply basis as the shown market cap.
           circulating_supply:
-            m.circulatingSupply ?? (m.price > 0 ? m.marketCap / m.price : null),
+            m.price > 0 ? cap / m.price : m.circulatingSupply,
           ath_price: m.ath ?? null,
           color: p.color,
           logo: m.image ?? null,
