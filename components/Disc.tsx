@@ -87,19 +87,26 @@ function logoNeedsLightDisc(img: HTMLImageElement): boolean {
  * globals.css (.menu .disc, .pair .disc), exactly like the reference.
  */
 export default function Disc({ coin }: { coin: Coin }) {
-  // Prefer a stored logo URL (e.g. CoinGecko-sourced coins like $ANSEM);
-  // otherwise derive it from the coinpaprika id convention via our proxy;
-  // otherwise fall back to the colored monogram.
-  const externalLogo =
-    coin.logo && coin.logo.startsWith("https://") ? coin.logo : null;
+  // Prefer a stored logo URL — same-origin paths ("/logos/…", self-hosted
+  // pinned coins) or an external https CDN — otherwise derive it from the
+  // coinpaprika id convention via our proxy; otherwise the monogram.
+  const storedLogo = coin.logo ?? null;
+  const externalLogo = storedLogo?.startsWith("https://") ? storedLogo : null;
+  const sameOriginLogo = storedLogo?.startsWith("/") ? storedLogo : null;
   const logoSrc =
-    externalLogo ?? (coin.id.includes("-") ? `/api/logo/${coin.id}` : null);
-  const [failed, setFailed] = useState(false);
+    sameOriginLogo ??
+    externalLogo ??
+    (coin.id.includes("-") ? `/api/logo/${coin.id}` : null);
+  // 0 = first try, 1 = cache-busted retry, ≥2 = give up → monogram. A
+  // transient load error must not stick the fallback (it used to: after a
+  // flip the errored state survived until a full page reload).
+  const [attempt, setAttempt] = useState(0);
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // A new coin gets a fresh chance even if the previous logo 404'd.
-  useEffect(() => setFailed(false), [coin.id]);
+  // New src (coin changed under this position, e.g. the FLIP swap) —
+  // fresh chances even if the previous logo errored.
+  useEffect(() => setAttempt(0), [logoSrc]);
 
   const evaluate = (img: HTMLImageElement) => {
     if (needsLightDisc.has(coin.id)) return;
@@ -116,28 +123,35 @@ export default function Disc({ coin }: { coin: Coin }) {
     const img = imgRef.current;
     if (img && img.complete && img.naturalWidth > 0) evaluate(img);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coin.id, failed]);
+  }, [coin.id, attempt]);
 
-  if (logoSrc && !failed) {
+  if (logoSrc && attempt <= 1) {
     const onLight = needsLightDisc.get(coin.id) === true;
+    const src =
+      attempt === 0
+        ? logoSrc
+        : `${logoSrc}${logoSrc.includes("?") ? "&" : "?"}retry=1`;
     return (
       // Tiny favicons with a JS error fallback — next/image's optimizer
-      // adds nothing here.
+      // adds nothing here. Keyed by coin id so a flip REMOUNTS the img
+      // instead of mutating src/crossOrigin on a live node — mobile
+      // Safari serves a CORS-mode mismatch from cache as a hard error,
+      // which is how ANSEM's logo used to die after a flip.
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        key={coin.id}
         ref={imgRef}
         className={`disc${onLight ? " on-light" : ""}`}
-        src={logoSrc}
-        // External CDN logos load in CORS mode (CoinGecko sends ACAO:*) so
-        // the canvas legibility check stays untainted; the same-origin
-        // proxy needs no crossOrigin.
+        src={src}
+        // Only external CDN logos need CORS mode (for the canvas check);
+        // same-origin images are canvas-clean by definition.
         crossOrigin={externalLogo ? "anonymous" : undefined}
         alt=""
         width={42}
         height={42}
         loading="lazy"
         onLoad={(e) => evaluate(e.currentTarget)}
-        onError={() => setFailed(true)}
+        onError={() => setAttempt((a) => a + 1)}
       />
     );
   }

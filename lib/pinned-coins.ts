@@ -21,6 +21,10 @@ export interface PinnedCoin {
   contract: string;
   /** Disc color. */
   color: string;
+  /** Self-hosted logo path (public/), overriding the CoinGecko image URL.
+   *  Hotlinking their CDN broke on mobile: rapid flips re-request the
+   *  image and intermittent failures stuck the monogram fallback. */
+  logo?: string;
 }
 
 export const PINNED_COINS: PinnedCoin[] = [
@@ -32,6 +36,7 @@ export const PINNED_COINS: PinnedCoin[] = [
     coingeckoId: "the-black-bull",
     contract: "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
     color: "#c0392b",
+    logo: "/logos/ansem.jpg",
   },
 ];
 

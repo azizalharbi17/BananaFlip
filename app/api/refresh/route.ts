@@ -168,7 +168,9 @@ async function refresh(request: Request): Promise<NextResponse> {
             m.price > 0 ? cap / m.price : m.circulatingSupply,
           ath_price: m.ath ?? null,
           color: p.color,
-          logo: m.image ?? null,
+          // Self-hosted logo wins over the CoinGecko CDN URL — hotlinks
+          // flaked on mobile re-requests (see pinned-coins.ts).
+          logo: p.logo ?? m.image ?? null,
           source: "coingecko",
           coingecko_id: p.coingeckoId,
           updated_at: now,
