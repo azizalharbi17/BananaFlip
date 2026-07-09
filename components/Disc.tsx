@@ -93,10 +93,14 @@ export default function Disc({ coin }: { coin: Coin }) {
   const storedLogo = coin.logo ?? null;
   const externalLogo = storedLogo?.startsWith("https://") ? storedLogo : null;
   const sameOriginLogo = storedLogo?.startsWith("/") ? storedLogo : null;
-  const logoSrc =
-    sameOriginLogo ??
-    externalLogo ??
-    (coin.id.includes("-") ? `/api/logo/${coin.id}` : null);
+  // The coinpaprika id→CDN convention only applies to binance-source coins;
+  // coingecko/dexscreener coins carry an explicit logo (or none → monogram),
+  // so they never do a doomed coinpaprika lookup.
+  const paprikaLogo =
+    (!coin.source || coin.source === "binance") && coin.id.includes("-")
+      ? `/api/logo/${coin.id}`
+      : null;
+  const logoSrc = sameOriginLogo ?? externalLogo ?? paprikaLogo;
   // 0 = first try, 1 = cache-busted retry, ≥2 = give up → monogram. A
   // transient load error must not stick the fallback (it used to: after a
   // flip the errored state survived until a full page reload).

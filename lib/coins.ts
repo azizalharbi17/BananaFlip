@@ -36,6 +36,10 @@ interface CoinRow {
   coingecko_id: string | null;
 }
 
+function toSource(s: string | null): "binance" | "coingecko" | "dexscreener" {
+  return s === "coingecko" || s === "dexscreener" ? s : "binance";
+}
+
 function rowToCoin(row: CoinRow): RankedCoin {
   return {
     id: row.id,
@@ -50,8 +54,11 @@ function rowToCoin(row: CoinRow): RankedCoin {
     athPrice: row.ath_price == null ? null : Number(row.ath_price),
     color: row.color,
     logo: row.logo ?? null,
-    source: row.source === "coingecko" ? "coingecko" : "binance",
+    source: toSource(row.source),
     coingeckoId: row.coingecko_id ?? null,
+    // Chain is encoded in the resolved-token id ("dex-<chain>-<addr>"),
+    // so no dedicated column is needed to satisfy "store the chain".
+    chain: row.id.startsWith("dex-") ? row.id.split("-")[1] ?? null : null,
   };
 }
 
@@ -127,8 +134,27 @@ export async function getRankedCoins(): Promise<RankedCoin[]> {
 }
 
 export async function getCoinBySlug(slug: string): Promise<RankedCoin | undefined> {
+  const key = slug.toLowerCase();
   const { coins } = await getCoins();
-  return coins.find((c) => c.slug === slug.toLowerCase());
+  const inWindow = coins.find((c) => c.slug === key);
+  if (inWindow) return inWindow;
+
+  // On-demand resolved tokens (source="dexscreener") can rank far beyond
+  // the cached top-2000 window, so look them up directly by slug. Keeps
+  // compare / coin / shareable pair pages working for the long tail.
+  const supabase = getSupabase();
+  if (!supabase) return undefined;
+  try {
+    const { data, error } = await supabase
+      .from("coins")
+      .select(DB_COLUMNS)
+      .eq("slug", key)
+      .maybeSingle();
+    if (error || !data) return undefined;
+    return rowToCoin(data as CoinRow);
+  } catch {
+    return undefined;
+  }
 }
 
 /**

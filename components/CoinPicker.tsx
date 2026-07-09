@@ -16,10 +16,14 @@ interface CoinPickerProps {
  * Coin select button + searchable dropdown. Typed queries hit
  * /api/search (debounced); the empty query lists every coin.
  */
+/** EVM (0x…40 hex) or Solana (base58 32–44) contract address. */
+const CONTRACT_RE = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/;
+
 export default function CoinPicker({ side, coin, coins, onSelect }: CoinPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<RankedCoin[]>(coins);
+  const [status, setStatus] = useState<"idle" | "resolving" | "not-found">("idle");
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -37,24 +41,44 @@ export default function CoinPicker({ side, coin, coins, onSelect }: CoinPickerPr
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  // Debounced autocomplete against the internal search API.
+  // Debounced: a pasted contract address resolves live via /api/resolve
+  // (any chain, any token); anything else searches our curated table.
   useEffect(() => {
     if (!open) return;
-    if (!query.trim()) {
+    const q = query.trim();
+    if (!q) {
       setResults(coins);
+      setStatus("idle");
       return;
     }
     const ctrl = new AbortController();
+    const isAddress = CONTRACT_RE.test(q);
+    setStatus(isAddress ? "resolving" : "idle");
     const timer = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(query)}`, { signal: ctrl.signal })
+      const url = isAddress
+        ? `/api/resolve?address=${encodeURIComponent(q)}`
+        : `/api/search?q=${encodeURIComponent(q)}`;
+      fetch(url, { signal: ctrl.signal })
         .then((r) => (r.ok ? r.json() : null))
-        .then((data: { results: RankedCoin[] } | null) => {
-          if (data) setResults(data.results);
+        .then((data: { results?: RankedCoin[]; coin?: RankedCoin } | null) => {
+          if (isAddress) {
+            if (data?.coin) {
+              setResults([data.coin]);
+              setStatus("idle");
+            } else {
+              setResults([]);
+              setStatus("not-found");
+            }
+          } else if (data?.results) {
+            setResults(data.results);
+            setStatus("idle");
+          }
         })
-        .catch(() => {
-          /* keep previous results on abort/network error */
+        .catch((e) => {
+          if (e?.name !== "AbortError" && isAddress) setStatus("not-found");
+          /* search errors keep the previous results */
         });
-    }, 120);
+    }, isAddress ? 250 : 120);
     return () => {
       clearTimeout(timer);
       ctrl.abort();
@@ -66,6 +90,7 @@ export default function CoinPicker({ side, coin, coins, onSelect }: CoinPickerPr
     if (next) {
       setQuery("");
       setResults(coins);
+      setStatus("idle");
     }
     setOpen(next);
   };
@@ -96,8 +121,8 @@ export default function CoinPicker({ side, coin, coins, onSelect }: CoinPickerPr
           ref={inputRef}
           className="search-in"
           type="text"
-          placeholder="Select a coin…"
-          aria-label="Select a coin"
+          placeholder="Search or paste a token address…"
+          aria-label="Search coins or paste a contract address"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -119,7 +144,15 @@ export default function CoinPicker({ side, coin, coins, onSelect }: CoinPickerPr
               </button>
             </li>
           ))}
-          {results.length === 0 && <li className="empty">No matches.</li>}
+          {status === "resolving" && (
+            <li className="empty">Resolving token…</li>
+          )}
+          {status === "not-found" && (
+            <li className="empty">Token not found — check the address.</li>
+          )}
+          {status === "idle" && results.length === 0 && query.trim() && (
+            <li className="empty">No matches.</li>
+          )}
         </ul>
       </div>
     </div>

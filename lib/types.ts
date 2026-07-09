@@ -15,13 +15,15 @@ export interface Coin {
   athPrice?: number | null;
   /** Brand color used for the coin disc (monogram fallback). */
   color: string;
-  /** Logo image URL when not derivable from the id (e.g. CoinGecko coins).
-   *  Null for coinpaprika coins, which derive the logo from their id. */
+  /** Logo image URL when not derivable from the id (CoinGecko / resolved
+   *  tokens). Null for coinpaprika coins, which derive it from their id. */
   logo?: string | null;
   /** Where this coin's data comes from. Defaults to "binance". */
-  source?: "binance" | "coingecko";
+  source?: "binance" | "coingecko" | "dexscreener";
   /** CoinGecko id for source="coingecko" coins (e.g. "the-black-bull"). */
   coingeckoId?: string | null;
+  /** Chain id for source="dexscreener" tokens (solana, ethereum, base…). */
+  chain?: string | null;
 }
 
 /** A coin plus its market-cap rank (1 = largest). */
