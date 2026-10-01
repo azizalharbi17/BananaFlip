@@ -16,7 +16,18 @@ export interface ResolvedToken {
   marketCap: number;
   /** Logo the source itself displays, or null. */
   imageUrl: string | null;
+  /** Top pair's liquidity and 24h volume (USD) — quality signals for the
+   *  trending cron; null when the source doesn't report them. */
+  liquidityUsd: number | null;
+  volume24hUsd: number | null;
 }
+
+/* API hosts, overridable for local testing against a stub (production
+   always talks to the public APIs). */
+const DEX_API = "https://api.dexscreener.com";
+const GT_API = "https://api.geckoterminal.com/api/v2";
+const dexBase = () => (process.env.DEXSCREENER_API_BASE ?? DEX_API).replace(/\/+$/, "");
+const gtBase = () => (process.env.GECKOTERMINAL_API_BASE ?? GT_API).replace(/\/+$/, "");
 
 const EVM_RE = /^0x[a-fA-F0-9]{40}$/;
 const SOLANA_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -32,6 +43,7 @@ interface DexPair {
   baseToken?: { address?: string; name?: string; symbol?: string };
   priceUsd?: string;
   liquidity?: { usd?: number };
+  volume?: { h24?: number };
   marketCap?: number;
   fdv?: number;
   info?: { imageUrl?: string };
@@ -39,7 +51,7 @@ interface DexPair {
 
 async function fromDexScreener(address: string): Promise<ResolvedToken | null> {
   const res = await fetch(
-    `https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(address)}`,
+    `${dexBase()}/latest/dex/tokens/${encodeURIComponent(address)}`,
     { cache: "no-store" }
   );
   if (!res.ok) return null;
@@ -70,6 +82,8 @@ async function fromDexScreener(address: string): Promise<ResolvedToken | null> {
     price,
     marketCap,
     imageUrl,
+    liquidityUsd: typeof top.liquidity?.usd === "number" ? top.liquidity.usd : null,
+    volume24hUsd: typeof top.volume?.h24 === "number" ? top.volume.h24 : null,
   };
 }
 
@@ -83,9 +97,7 @@ async function fromGeckoTerminal(address: string): Promise<ResolvedToken | null>
   for (const net of networks) {
     try {
       const res = await fetch(
-        `https://api.geckoterminal.com/api/v2/networks/${net}/tokens/${encodeURIComponent(
-          address
-        )}`,
+        `${gtBase()}/networks/${net}/tokens/${encodeURIComponent(address)}`,
         { cache: "no-store", headers: { accept: "application/json" } }
       );
       if (!res.ok) continue;
@@ -105,6 +117,11 @@ async function fromGeckoTerminal(address: string): Promise<ResolvedToken | null>
         imageUrl: typeof a.image_url === "string" && a.image_url.startsWith("http")
           ? (a.image_url as string)
           : null,
+        liquidityUsd: Number(a.total_reserve_in_usd) > 0 ? Number(a.total_reserve_in_usd) : null,
+        volume24hUsd:
+          Number((a.volume_usd as { h24?: unknown } | undefined)?.h24) > 0
+            ? Number((a.volume_usd as { h24?: unknown }).h24)
+            : null,
       };
     } catch {
       /* try the next network */

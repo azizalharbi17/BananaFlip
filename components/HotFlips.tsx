@@ -10,17 +10,24 @@ export interface HotRow {
 }
 
 interface HotFlipsProps {
-  /** Resolved server-side from HOT_PAIRS so rows survive any list slicing. */
+  /** Resolved server-side (trending set, or HOT_PAIRS as the fallback) so
+   *  rows survive any list slicing. */
   rows: HotRow[];
+  /** Header hint next to the title. */
+  caption?: string;
   onLoadPair: (challenger: RankedCoin, target: RankedCoin) => void;
 }
 
-export default function HotFlips({ rows, onLoadPair }: HotFlipsProps) {
+export default function HotFlips({
+  rows,
+  caption = "tap a row to load it",
+  onLoadPair,
+}: HotFlipsProps) {
   return (
     <>
       <div className="section-h" id="hot">
         <h2>Hot Flips</h2>
-        <span>tap a row to load it</span>
+        <span>{caption}</span>
       </div>
       <div className="table">
         <div className="trow head">

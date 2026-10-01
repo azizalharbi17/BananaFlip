@@ -3,7 +3,8 @@ import FlipDashboard from "./FlipDashboard";
 import Hero from "./Hero";
 import MoonMath from "./MoonMath";
 import RoiCalculator from "./RoiCalculator";
-import { getCoins } from "@/lib/coins";
+import { getCoins, getTrendingCoins } from "@/lib/coins";
+import { buildTrendingRows } from "@/lib/hot-flips";
 import { HOT_PAIRS } from "@/lib/pairs";
 import { PINNED_SLUGS } from "@/lib/pinned-coins";
 import type { RankedCoin } from "@/lib/types";
@@ -18,7 +19,10 @@ interface SiteContentProps {
 
 /** Full page body, shared by the homepage and every /a-flip-b pair page. */
 export default async function SiteContent({ challenger, target }: SiteContentProps) {
-  const { coins, isDemoData } = await getCoins();
+  const [{ coins, isDemoData }, trending] = await Promise.all([
+    getCoins(),
+    getTrendingCoins(),
+  ]);
 
   // The client gets the top slice, not all ~2000 coins — search covers the
   // rest. Hot-flip rows are resolved here so they never depend on the slice.
@@ -31,11 +35,18 @@ export default async function SiteContent({ challenger, target }: SiteContentPro
   );
   const topCoins = [...top, ...pinnedExtra];
   const bySlug = new Map(coins.map((c) => [c.slug, c]));
-  const hotRows = HOT_PAIRS.flatMap(({ challengerSlug, targetSlug }) => {
+  const curatedRows = HOT_PAIRS.flatMap(({ challengerSlug, targetSlug }) => {
     const c = bySlug.get(challengerSlug);
     const t = bySlug.get(targetSlug);
     return c && t ? [{ challenger: c, target: t }] : [];
   });
+  // Hot flips = the auto-discovered trending set (by rank) whenever the
+  // cron has produced one; the curated pairs are the fallback (demo mode,
+  // first deploy, or the trending columns not migrated yet).
+  const trendingRows = isDemoData ? [] : buildTrendingRows(trending, bySlug, coins);
+  const hotRows = trendingRows.length > 0 ? trendingRows : curatedRows;
+  const hotCaption =
+    trendingRows.length > 0 ? "trending now · tap a row to load it" : undefined;
 
   return (
     <>
@@ -46,6 +57,7 @@ export default async function SiteContent({ challenger, target }: SiteContentPro
           initialChallenger={challenger}
           initialTarget={target}
           hotRows={hotRows}
+          hotCaption={hotCaption}
         />
         <RoiCalculator coins={topCoins} isDemoData={isDemoData} />
         <MoonMath coins={topCoins} isDemoData={isDemoData} />

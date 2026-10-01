@@ -18,6 +18,23 @@ export const HOT_PAIRS: PairSlugs[] = [
   { challengerSlug: "sui", targetSlug: "sol" },
 ];
 
+/**
+ * Targets for auto-discovered trending tokens in "Hot flips" (see
+ * lib/hot-flips.ts): the big memecoins, then the majors. Sorted by live
+ * cap at render time; a trending coin targets the smallest rung above it.
+ */
+export const TRENDING_TARGET_LADDER = [
+  "bonk",
+  "wif",
+  "floki",
+  "pepe",
+  "shib",
+  "doge",
+  "sol",
+  "eth",
+  "btc",
+];
+
 export function pairSlug({ challengerSlug, targetSlug }: PairSlugs): string {
   return `${challengerSlug}-flip-${targetSlug}`;
 }
