@@ -24,6 +24,9 @@ export interface Coin {
   coingeckoId?: string | null;
   /** Chain id for source="dexscreener" tokens (solana, ethereum, base…). */
   chain?: string | null;
+  /** Position in the auto-discovered trending set (1 = hottest); only set
+   *  on coins served by getTrendingCoins(). */
+  trendingRank?: number | null;
 }
 
 /** A coin plus its market-cap rank (1 = largest). */

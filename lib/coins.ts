@@ -129,6 +129,43 @@ export const getCoins = unstable_cache(fetchDataset, ["coins-dataset"], {
   tags: ["coins"],
 });
 
+/** Upper bound on the trending set (the cron caps it lower). */
+const MAX_TRENDING = 30;
+
+/**
+ * The auto-discovered trending set (Hot Flips), hottest first. Its own
+ * query on purpose: trending memecoins usually rank far outside the
+ * top-2000 window, and the main list / picker must not absorb them.
+ * Empty when Supabase is unconfigured, the cron hasn't run yet, or the
+ * trending columns (migration 0006) don't exist — the page then falls
+ * back to the curated HOT_PAIRS, never a blank section.
+ */
+async function fetchTrending(): Promise<RankedCoin[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from("coins")
+      .select(`${DB_COLUMNS},trending_rank`)
+      .eq("is_trending", true)
+      .order("trending_rank", { ascending: true })
+      .limit(MAX_TRENDING);
+    if (error || !data) return [];
+    return (data as (CoinRow & { trending_rank: number | null })[]).map((row) => ({
+      ...rowToCoin(row),
+      trendingRank: row.trending_rank ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Cached 60s; the trending cron busts it via revalidateTag("coins"). */
+export const getTrendingCoins = unstable_cache(fetchTrending, ["trending-coins"], {
+  revalidate: 60,
+  tags: ["coins"],
+});
+
 export async function getRankedCoins(): Promise<RankedCoin[]> {
   return (await getCoins()).coins;
 }

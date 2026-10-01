@@ -13,6 +13,8 @@ interface FlipDashboardProps {
   initialChallenger: RankedCoin;
   initialTarget: RankedCoin;
   hotRows: HotRow[];
+  /** Hot-flips header hint; defaults to the reference's "tap a row…". */
+  hotCaption?: string;
 }
 
 const reducedMotion = () =>
@@ -28,6 +30,7 @@ export default function FlipDashboard({
   initialChallenger,
   initialTarget,
   hotRows,
+  hotCaption,
 }: FlipDashboardProps) {
   const [pair, setPair] = useState(() => ({
     a: initialChallenger,
@@ -180,7 +183,7 @@ export default function FlipDashboard({
 
       <Verdict a={pair.a} b={pair.b} coins={coins} pulse={pulse} />
 
-      <HotFlips rows={hotRows} onLoadPair={loadPair} />
+      <HotFlips rows={hotRows} caption={hotCaption} onLoadPair={loadPair} />
     </>
   );
 }

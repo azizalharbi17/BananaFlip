@@ -14,7 +14,8 @@ impliedPrice = priceA × (mcapB / mcapA)
 - Tailwind CSS (design tokens in [tailwind.config.ts](tailwind.config.ts),
   mirrored as CSS variables in [app/globals.css](app/globals.css))
 - Fonts via `next/font`: Space Grotesk (display), Inter (body), JetBrains Mono (data)
-- Supabase (Postgres) for live coin data, refreshed from coinpaprika by cron
+- Supabase (Postgres + Storage) for live coin data, refreshed from coinpaprika by cron;
+  trending memecoins auto-discovered from GeckoTerminal/DexScreener by Vercel Cron
 - Deploys to Vercel as-is
 
 ## Development
@@ -74,7 +75,9 @@ a stable mid-tone color hashed from its symbol ([lib/colors.ts](lib/colors.ts)).
 | --- | --- |
 | `SUPABASE_URL` | Supabase project URL (server-side only) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key (server-side only) |
-| `CRON_SECRET` | Bearer token guarding `/api/refresh` |
+| `CRON_SECRET` | Bearer token guarding `/api/refresh` and `/api/cron/trending` (Vercel Cron sends it automatically) |
+| `TRENDING_MIN_LIQUIDITY_USD` / `TRENDING_MIN_VOLUME_USD` | Optional floors for trending tokens (default $100k each) |
+| `TRENDING_LIMIT` / `TRENDING_NETWORKS` / `TRENDING_DURATION` / `TRENDING_CONCURRENCY` / `TRENDING_MAX_MCAP_USD` | Optional trending-cron knobs (defaults 15 / `solana,base,eth,bsc` / `24h` / 3 / $20B) |
 | `CRYPTOCOMPARE_API_KEY` | Free CoinDesk-data key for ROI price history |
 | `COINGECKO_API_KEY` | Optional CoinGecko demo key (headroom for pinned coins) |
 | `NEXT_PUBLIC_SITE_URL` | Optional canonical origin for metadata/sitemap |
@@ -88,6 +91,8 @@ a stable mid-tone color hashed from its symbol ([lib/colors.ts](lib/colors.ts)).
 | `GET /api/compare?challenger=pepe&target=doge` | Implied price, multiplier, cap gap, already-flipped flag |
 | `GET /api/history?symbol=BTC[&year=2017]` | Year range (first→last) or that year's first close, or `{available:false}` |
 | `GET/POST /api/refresh` | Cron-only data refresh (bearer auth) |
+| `GET /api/resolve?address=0x…` | Any on-chain token by contract (DexScreener), cached in `coins` with a self-hosted logo |
+| `GET/POST /api/cron/trending` | Cron-only trending auto-discovery → the Hot Flips set (bearer auth) |
 
 ### Pinned CoinGecko coins
 
@@ -101,6 +106,63 @@ refresh route and stored in the `coins` table; their history comes from
 CoinGecko `market_chart` (capped to the listing date) through the same
 `coin_history` read-through cache. Migration 0004 adds the `source` /
 `coingecko_id` columns.
+
+### Trending auto-discovery (Hot Flips)
+
+New memecoins reach the site — and fill the **Hot Flips** table — without
+anyone pasting contracts. `/api/cron/trending` runs every 2 hours on
+[Vercel Cron](vercel.json) (tunable; daily is the floor — memecoins move
+fast) and is guarded by `CRON_SECRET`, which Vercel sends as
+`Authorization: Bearer …` on every scheduled call, so the public can't
+trigger it. Hobby-plan projects are limited to daily crons: change the
+schedule to `0 6 * * *` there.
+
+```
+GeckoTerminal trending pools ──▶ quality filters ──▶ DexScreener resolver ──▶ coins (source=dexscreener,
+(/networks/trending_pools +         liq ≥ $100k        (same path as a           is_trending + trending_rank)
+ solana / base / eth / bsc)         vol24h ≥ $100k      pasted contract:                │
+                                    no stables/wrapped  price, marketCap/FDV,     getTrendingCoins() ──▶ Hot Flips, by rank
+                                    not in curated list self-hosted logo)
+```
+
+1. **Discover** — [lib/trending.ts](lib/trending.ts) pulls GeckoTerminal's
+   cross-network trending feed plus one per configured network (ranked by
+   real volume/activity, not paid boosts) and merges them into one ranking:
+   cross-network order first, then the per-network feeds interleaved so no
+   chain crowds out the rest. One candidate per token, carrying its
+   strongest pool's liquidity and 24 h volume.
+2. **Filter** — liquidity *and* 24 h volume floors (env-configurable),
+   stablecoins / wrapped natives / LSTs, and anything already in the curated
+   list (top-500 coinpaprika coins + pinned coins: BTC or PEPE are never
+   "trending"), plus a sanity cap on market cap.
+3. **Resolve** — each survivor goes through the *existing* resolver in
+   [lib/token-resolve.ts](lib/token-resolve.ts): DexScreener price and
+   `marketCap` (FDV fallback — the same rule as pasted tokens; established
+   coins keep circulating cap), the logo self-hosted into the `token-logos`
+   bucket (served by `/api/token-logo/:id`), a `coins` row. The feed's own
+   image is the fallback logo source. Anything without a price, cap or
+   stored logo — or whose DexScreener top pair is under the floors, or on a
+   different chain than the feed said — is skipped. At most 3 resolve in
+   parallel (storage uploads share the Postgres pool), with upload retries.
+4. **Store** — the top 15 are upserted with `is_trending = true` and
+   `trending_rank`; the previous run's flags are cleared, so the set
+   **reflects what's trending now** and never grows unbounded. Rows are never
+   deleted: a coin that drops off the list stays searchable and flippable.
+   Migration [0006](supabase/migrations/0006_coin_trending.sql) adds the
+   columns.
+5. **Show** — `getTrendingCoins()` (own query, 60 s cache, busted by the
+   cron) feeds Hot Flips by rank; each trending coin targets the smallest
+   rung of the BONK → WIF → FLOKI → PEPE → SHIB → DOGE → SOL → ETH → BTC
+   ladder that is still bigger than it ([lib/hot-flips.ts](lib/hot-flips.ts)).
+   The main list / picker ranking is untouched — trending is its own flagged
+   set. Before the first run, in demo mode, or if the cron can't produce a
+   set, the curated `HOT_PAIRS` show instead.
+
+**Graceful failure:** if GeckoTerminal is down, returns nothing, or nothing
+passes the filters/resolver, the run reports `kept: true` and leaves the
+previous set untouched — Hot Flips never blanks out. Run it by hand with
+`node scripts/run-trending-cron.mjs [origin]` (reads `CRON_SECRET` from
+`.env.local`).
 
 ### NOW / ATH toggle
 
@@ -144,9 +206,11 @@ the ROI uses; "since launch" when the coin is younger than the horizon).
 
 ### Coin logos
 
-Pickers and the hot-flips table show coinpaprika logos
-(`static.coinpaprika.com/coin/{id}/logo.png`), falling back to the
-colored monogram disc on load errors and in demo mode.
+Pickers and the hot-flips table show coinpaprika logos (mirrored into our
+Supabase Storage and served by `/api/logo/:id`), falling back to the
+colored monogram disc on load errors and in demo mode. Resolved and
+trending tokens carry a self-hosted copy of their DexScreener/GeckoTerminal
+image (`/api/token-logo/:id`), so the browser never hotlinks a third-party CDN.
 
 ## Shareable flip pages
 
