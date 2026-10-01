@@ -110,12 +110,11 @@ CoinGecko `market_chart` (capped to the listing date) through the same
 ### Trending auto-discovery (Hot Flips)
 
 New memecoins reach the site — and fill the **Hot Flips** table — without
-anyone pasting contracts. `/api/cron/trending` runs every 2 hours on
-[Vercel Cron](vercel.json) (tunable; daily is the floor — memecoins move
-fast) and is guarded by `CRON_SECRET`, which Vercel sends as
-`Authorization: Bearer …` on every scheduled call, so the public can't
-trigger it. Hobby-plan projects are limited to daily crons: change the
-schedule to `0 6 * * *` there.
+anyone pasting contracts. `/api/cron/trending` runs daily at 06:00 UTC on
+[Vercel Cron](vercel.json) — the Hobby plan's limit; on Pro, tighten the
+schedule to every couple of hours, memecoins move fast — and is guarded by
+`CRON_SECRET`, which Vercel sends as `Authorization: Bearer …` on every
+scheduled call, so the public can't trigger it.
 
 ```
 GeckoTerminal trending pools ──▶ quality filters ──▶ DexScreener resolver ──▶ coins (source=dexscreener,

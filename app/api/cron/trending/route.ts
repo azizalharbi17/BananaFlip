@@ -26,7 +26,8 @@ type Supabase = NonNullable<ReturnType<typeof getSupabase>>;
 
 /**
  * GET/POST /api/cron/trending — refresh the auto-discovered trending set
- * behind "Hot Flips". Scheduled by Vercel Cron (vercel.json, every 2h);
+ * behind "Hot Flips". Scheduled by Vercel Cron (vercel.json, daily — the
+ * Hobby plan's limit; tighten on Pro);
  * Vercel sends `Authorization: Bearer $CRON_SECRET` itself, so the route
  * is never publicly triggerable.
  *

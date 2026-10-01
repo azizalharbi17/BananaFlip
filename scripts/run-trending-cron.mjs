@@ -1,5 +1,5 @@
 // Trigger /api/cron/trending by hand and print the resulting set — the
-// same call Vercel Cron makes every 2 hours (vercel.json).
+// same call Vercel Cron makes on its schedule (vercel.json).
 //
 //   node scripts/run-trending-cron.mjs                       # production
 //   node scripts/run-trending-cron.mjs http://localhost:3000 # local dev
