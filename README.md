@@ -1,22 +1,113 @@
 # 🍌 BananaFlip
 
-**Can it flip?** A crypto market-cap comparison tool. Pick two coins —
-BananaFlip shows Coin A's price at Coin B's market cap, and how many ×'s
-away the flip is.
+**Can it flip?** BananaFlip is a crypto market-cap comparison tool. Pick two coins and it shows what Coin A's price would be at Coin B's market cap, and how many times it would have to grow to "flip" it. Three calculators built on real historical prices sit alongside it.
+
+**Live app:** [www.bananaflip.io](https://www.bananaflip.io)
+
+![BananaFlip: PEPE at DOGE's market cap](docs/screenshots/flip.png)
 
 ```
 impliedPrice = priceA × (mcapB / mcapA)
 ```
 
-## Stack
+---
 
-- [Next.js 14](https://nextjs.org) (App Router) · React 18 · TypeScript
-- Tailwind CSS (design tokens in [tailwind.config.ts](tailwind.config.ts),
-  mirrored as CSS variables in [app/globals.css](app/globals.css))
-- Fonts via `next/font`: Space Grotesk (display), Inter (body), JetBrains Mono (data)
-- Supabase (Postgres + Storage) for live coin data, refreshed from coinpaprika by cron;
-  trending memecoins auto-discovered from GeckoTerminal/DexScreener by Vercel Cron
-- Deploys to Vercel as-is
+## The problem
+
+Crypto communities constantly ask "what would my coin be worth if it reached X's size?" Answering that by hand means looking up two market caps, doing the math, and getting the units right. The answers are also easy to misread: a coin's price alone says nothing about how much it would have to grow. BananaFlip answers these questions instantly with live data, gives every comparison a shareable link, and labels everything as arithmetic, not a forecast.
+
+## Features
+
+- **Market-cap flip comparison.** Choose any two coins from roughly 2,000 ranked coins.
+  - BananaFlip shows Coin A's implied price at Coin B's market cap, the multiple needed, and the market-cap gap.
+  - A **NOW / ATH** toggle compares against Coin B's all-time-high market cap.
+  - An **"If I hold"** input shows what your own amount of Coin A would be worth at that price.
+- **Any token by contract address.** Paste an EVM or Solana contract address and BananaFlip looks the token up on DexScreener, stores it, and makes it comparable like any other coin.
+- **Hot Flips.** A daily job finds trending memecoins on GeckoTerminal, filters them by liquidity and volume, and pairs each one with the smallest coin on a BONK → WIF → FLOKI → PEPE → SHIB → DOGE → SOL → ETH → BTC ladder that is still bigger than it.
+- **ROI Time Machine.** What a past purchase would be worth today, using real daily closing prices. It shows a worst / your entry / best timing range, a "still holding vs. sold the top" toggle, and preset scenarios (BTC 2013 … PEPE 2023).
+- **DCA Time Machine.** Replays a fixed USD purchase made daily, weekly, every two weeks or monthly from a chosen start date. It shows:
+  - total invested, number of buys, current value, and profit or loss
+  - coins owned and average cost
+  - the result if the same money had been invested all on day one
+  - the same plan applied to BTC
+- **Moon Math.** Target arithmetic: how many times a coin must grow to turn an amount into a goal over 1–30 years. It compares the yearly growth that would require with the coin's actual historical growth.
+- **Shareable pages.** Every pair has its own URL (`/pepe-flip-doge`) with page metadata and a generated social preview image. Popular pairs are pre-rendered, and there's a sitemap.
+- **Demo mode.** Without database credentials the site runs on a bundled data set and is clearly labelled **DEMO DATA**.
+
+| Hot Flips | Calculators (ROI · Moon Math · DCA) |
+|---|---|
+| ![Hot Flips table](docs/screenshots/hot-flips.png) | ![ROI, Moon Math and DCA calculators](docs/screenshots/calculators.png) |
+
+## How it works
+
+```
+ coinpaprika ──(GitHub Actions, every 10 min)──▶ /api/refresh ──▶ Supabase `coins`
+ CoinGecko (pinned coins) ───────────────────────┘                      │
+                                                                        ▼
+ GeckoTerminal trending ─▶ filters ─▶ DexScreener resolver ─▶ Hot Flips set (Vercel Cron, daily)
+                                                                        │
+ Binance daily closes ─▶ CryptoCompare fallback ─▶ Supabase `coin_history` cache
+                                                                        │
+                                   Next.js pages + API routes on Vercel ◀┘
+```
+
+- **Live prices** for about 2,000 coins come from coinpaprika every 10 minutes and are stored in Supabase.
+- **Price history** for the ROI, DCA and Moon Math calculators comes from Binance's public daily price data. CryptoCompare is a fallback, and CoinGecko covers a few pinned coins. History is cached in Supabase so each upstream source is called only about once per coin.
+- **Logos** are copied into Supabase Storage and served from the site itself, so the app doesn't depend on third-party image hosts.
+- **Every data path has a fallback.** If a refresh fails, the last good data keeps being served. If the trending job finds nothing usable, the previous Hot Flips list stays in place.
+
+## Tech stack
+
+| Area | Technology |
+|---|---|
+| Web app | Next.js 14 (App Router), React 18, TypeScript |
+| Styling | Tailwind CSS with design tokens mirrored as CSS variables; Space Grotesk, Inter and JetBrains Mono via `next/font` |
+| Database & storage | Supabase (Postgres + Storage) |
+| Market data | coinpaprika, CoinGecko, DexScreener, GeckoTerminal, Binance public data, CryptoCompare |
+| Scheduling | GitHub Actions (price refresh), Vercel Cron (trending discovery) |
+| Hosting | Vercel |
+
+## Technical challenges and solutions
+
+These are drawn from the commit history and code.
+
+- **Calculators broke in production because of an API quota.**
+  - *Problem:* price history originally came only from CryptoCompare, whose free key allows about 100 calls a month. Production used that up, and the ROI and DCA calculators showed "unavailable."
+  - *Solution:* make Binance's free public data mirror the main source, keep CryptoCompare only as a fallback, and store history in Supabase so each coin is fetched about once (`app/api/history/route.ts`).
+- **Prices quietly stopped updating.**
+  - *Problem:* the scheduled refresh called the bare domain, which redirects to `www`. The redirect dropped the authorised POST, so prices went stale without any error.
+  - *Solution:* call the canonical `www` host directly (`.github/workflows/refresh.yml`).
+- **The DCA calculator got stuck on "unavailable."**
+  - *Problem:* temporary network failures were being cached permanently.
+  - *Solution:* the client now caches only confirmed "no data" answers and retries after temporary failures (`lib/history-client.ts`).
+- **A coin logo vanished on mobile Safari after flipping.**
+  - *Problem:* React was reusing the same image element with a changed source.
+  - *Solution:* re-mount the image whenever the coin changes, add a retry, and host that logo on the site itself (`components/Disc.tsx`).
+- **A data source began blocking hotlinked images.**
+  - *Solution:* copy logos into Supabase Storage once and serve them from the app's own `/api/logo/:id` route.
+- **Bad historical data.**
+  - *Problem:* some sources attach another asset's price history to a ticker.
+  - *Solution:* history before any one-day price jump of 1000× or more is ignored.
+
+## How I built this
+
+I built BananaFlip using **AI-assisted development, primarily with Claude Code**. My role was:
+
+- leading the product concept and defining the requirements for each calculator
+- approving the visual design, which is kept in `design-reference.html`
+- testing on desktop and mobile
+- debugging production issues like the ones above
+- deploying it on Vercel and Supabase
+
+Claude Code generated most of the code under my direction. The project grew over 56 commits between June and October 2026.
+
+## Disclaimer
+
+Prices come from coinpaprika, CoinGecko and DexScreener. History comes from Binance and CryptoCompare. Demo mode uses seeded example figures and is labelled as such. All calculators are arithmetic on past or current data, not forecasts. **Not financial advice.**
+
+---
+
+# Technical reference
 
 ## Development
 
@@ -100,8 +191,8 @@ Most coins flow through coinpaprika (current values) and Binance (history).
 Coins that aren't on Binance — e.g. the Solana Pump.fun token **$ANSEM**
 ("The Black Bull") — are pinned in [lib/pinned-coins.ts](lib/pinned-coins.ts)
 by CoinGecko id + contract (never by ticker; copycats abound) with
-`source = "coingecko"`. Their current values (circulating market cap —
-**not** FDV — plus supply and ATH) are pulled from CoinGecko in the
+`source = "coingecko"`. Their current values (market cap — FDV when
+CoinGecko reports one, otherwise circulating cap — plus supply and ATH) are pulled from CoinGecko in the
 refresh route and stored in the `coins` table; their history comes from
 CoinGecko `market_chart` (capped to the listing date) through the same
 `coin_history` read-through cache. Migration 0004 adds the `source` /
@@ -188,20 +279,29 @@ coin's first available data. The result shows a WORST TIMING / YOUR
 ENTRY / BEST TIMING spread (bought the year's top / your month / the
 year's low), a STILL HOLDING vs SOLD THE TOP exit toggle (sell at the
 highest close after entry), and preset scenario chips (BTC 2013 …
-PEPE 2023). Requires `CRYPTOCOMPARE_API_KEY` (free at
-developers.coindesk.com — the keyless tier was retired); without it, or
-for coins CryptoCompare doesn't track, the calculator shows
-*historical data unavailable for this range*. Demo mode synthesizes the
+PEPE 2023). `CRYPTOCOMPARE_API_KEY` (free at developers.coindesk.com) is
+only needed for coins Binance doesn't list; when no source has data for a
+coin, the calculator shows *historical data unavailable for this range*. Demo mode synthesizes the
 same shapes from seeded figures, labeled as such.
 
 ### Moon math
 
 Target-mode arithmetic — no predictions: amount, coin, target chips or a
 custom target, and a 1–30 year horizon. Shows the required multiple,
-required price, implied market cap with reality anchors (live BTC/ETH
-caps from our DB, approximate gold/Apple constants), and required vs
+required price, implied market cap compared with Bitcoin's live market
+cap (Ethereum's when the coin is BTC), and required vs
 historical compound pace (the latter from the same cached history fetch
 the ROI uses; "since launch" when the coin is younger than the horizon).
+
+### DCA time machine
+
+Replays a fixed USD buy (default $100) on a daily, weekly, biweekly or
+monthly schedule from a chosen month and year (2011 onward) against real
+daily closes from the same `/api/history` payload. Shows total invested,
+number of buys, current value, profit ($ and %), coins owned and average
+cost vs. today's price, a lump-sum-on-day-one comparison, and the same
+plan into BTC. Starts earlier than a coin's data clamp to "since launch".
+Demo mode skips history entirely.
 
 ### Coin logos
 
@@ -227,8 +327,3 @@ regenerated hourly.
 source of truth. The CSS in `app/globals.css` is a 1:1 port of its stylesheet;
 components reproduce its markup, animations (card flip, verdict count-up) and
 breakpoint behavior, and respect `prefers-reduced-motion`.
-
-## Disclaimer
-
-Market data by coinpaprika. The ROI time machine uses synthetic historical
-figures and is labeled accordingly. Not financial advice.
